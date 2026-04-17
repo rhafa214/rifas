@@ -4,5 +4,96 @@
         "preco": 10.0,
         "data_sorteio": "2026-05-09T20:00:00"
     },
-    "vendas": {}
+    "vendas": {
+        "69": {
+            "nome": "Ana Maria - Gramadinho",
+            "tel": "",
+            "pago": false,
+            "data": "17/04/2026"
+        },
+        "58": {
+            "nome": "Ana Maria - Gramadinho",
+            "tel": "",
+            "pago": false,
+            "data": "17/04/2026"
+        },
+        "66": {
+            "nome": "Paulinho - gramadinho",
+            "tel": "",
+            "pago": false,
+            "data": "17/04/2026"
+        },
+        "14": {
+            "nome": "Vanderlei",
+            "tel": "",
+            "pago": true,
+            "data": "17/04/2026"
+        },
+        "16": {
+            "nome": "Vanderlei",
+            "tel": "",
+            "pago": true,
+            "data": "17/04/2026"
+        },
+        "3": {
+            "nome": "Vanderlei",
+            "tel": "",
+            "pago": true,
+            "data": "17/04/2026"
+        },
+        "24": {
+            "nome": "Vanderlei",
+            "tel": "",
+            "pago": true,
+            "data": "17/04/2026"
+        },
+        "17": {
+            "nome": "Vanderlei",
+            "tel": "",
+            "pago": true,
+            "data": "17/04/2026"
+        },
+        "22": {
+            "nome": "Ademir",
+            "tel": "",
+            "pago": true,
+            "data": "17/04/2026"
+        },
+        "19": {
+            "nome": "Ademir",
+            "tel": "",
+            "pago": true,
+            "data": "17/04/2026"
+        },
+        "9": {
+            "nome": "Ademir",
+            "tel": "",
+            "pago": true,
+            "data": "17/04/2026"
+        },
+        "11": {
+            "nome": "Ademir",
+            "tel": "",
+            "pago": true,
+            "data": "17/04/2026"
+        },
+        "21": {
+            "nome": "Ademir",
+            "tel": "",
+            "pago": true,
+            "data": "17/04/2026"
+        },
+        "57": {
+            "nome": "Cana",
+            "tel": "",
+            "pago": false,
+            "data": "17/04/2026"
+        },
+        "51": {
+            "nome": "Cana",
+            "tel": "",
+            "pago": false,
+            "data": "17/04/2026"
+        }
+    }
 }
