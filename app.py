@@ -190,17 +190,32 @@ with tab_mapa:
 
 with tab_sorteio:
     st.subheader("🎲 Realizar Sorteio")
-    st.info("O sistema sorteia apenas entre os números PAGOS (Verdes).")
+    
+    # --- NOVO BOTÃO DE RESET DE GANHADORES ---
+    col_t1, col_t2 = st.columns([3, 1])
+    with col_t1:
+        st.info("O sistema sorteia apenas entre os números PAGOS (Verdes).")
+    with col_t2:
+        if st.button("🗑️ Limpar Ganhadores", help="Clique aqui para apagar os testes e recomeçar o sorteio"):
+            st.session_state.vencedores = {}
+            st.success("Sorteio resetado!")
+            st.rerun()
+    
+    st.divider()
     
     col_p1, col_p2, col_p3 = st.columns(3)
     
     # Função interna para animar sorteio
     def animar_sorteio(premio_nome, lista_pagos):
         ph = st.empty()
+        # Contagem regressiva
         for i in range(3, 0, -1):
-            ph.markdown(f"<h1 style='text-align:center;'>{i}</h1>", unsafe_allow_html=True); time.sleep(1)
+            ph.markdown(f"<h1 style='text-align:center; color: #ffc107;'>{i}</h1>", unsafe_allow_html=True)
+            time.sleep(1)
+        # Efeito de rotação de números
         for _ in range(15):
-            ph.markdown(f"<h1 style='text-align:center;'>{random.randint(1, total_n):02d}</h1>", unsafe_allow_html=True); time.sleep(0.1)
+            ph.markdown(f"<h1 style='text-align:center; color: #666;'>{random.randint(1, total_n):02d}</h1>", unsafe_allow_html=True)
+            time.sleep(0.1)
         
         ganhador_num = random.choice(lista_pagos)
         st.balloons()
@@ -208,43 +223,70 @@ with tab_sorteio:
 
     pagos_lista = [n for n, v in vendas.items() if v["pago"]]
 
-    with col_p3: # 3º lugar primeiro
-        st.write(f"**3º Prêmio:** {dados['config']['premio3']}")
+    # --- SORTEIO DO 3º LUGAR ---
+    with col_p3: 
+        st.write(f"**3º Prêmio:** {dados['config'].get('premio3', 'Prêmio 3')}")
         if st.button("Sortear 3º Lugar"):
             if pagos_lista:
-                res = animar_sorteio(dados['config']['premio3'], pagos_lista)
+                res = animar_sorteio(dados['config'].get('premio3'), pagos_lista)
                 st.session_state.vencedores["3"] = {"num": res, "nome": vendas[res]["nome"]}
+                st.rerun()
             else: st.error("Sem números pagos.")
+        
         if "3" in st.session_state.vencedores:
             v = st.session_state.vencedores["3"]
-            st.success(f"🥉 Ganhador: {v['num']} - {v['nome']}")
+            st.markdown(f"""
+                <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid #cd7f32; text-align: center;">
+                    <span style="font-size: 24px;">🥉</span><br>
+                    <b>Número: {v['num']}</b><br>{v['nome']}
+                </div>
+            """, unsafe_allow_html=True)
 
+    # --- SORTEIO DO 2º LUGAR ---
     with col_p2:
-        st.write(f"**2º Prêmio:** {dados['config']['premio2']}")
+        st.write(f"**2º Prêmio:** {dados['config'].get('premio2', 'Prêmio 2')}")
         if st.button("Sortear 2º Lugar"):
-            # Evita sortear o mesmo número se já ganhou o 3º
-            lista_filtrada = [n for n in pagos_lista if n != st.session_state.vencedores.get("3", {}).get("num")]
+            # Filtra para não repetir quem já ganhou o 3º
+            ganhador_3 = st.session_state.vencedores.get("3", {}).get("num")
+            lista_filtrada = [n for n in pagos_lista if n != ganhador_3]
+            
             if lista_filtrada:
-                res = animar_sorteio(dados['config']['premio2'], lista_filtrada)
+                res = animar_sorteio(dados['config'].get('premio2'), lista_filtrada)
                 st.session_state.vencedores["2"] = {"num": res, "nome": vendas[res]["nome"]}
+                st.rerun()
             else: st.error("Sem números pagos disponíveis.")
+            
         if "2" in st.session_state.vencedores:
             v = st.session_state.vencedores["2"]
-            st.success(f"🥈 Ganhador: {v['num']} - {v['nome']}")
+            st.markdown(f"""
+                <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid #c0c0c0; text-align: center;">
+                    <span style="font-size: 24px;">🥈</span><br>
+                    <b>Número: {v['num']}</b><br>{v['nome']}
+                </div>
+            """, unsafe_allow_html=True)
 
+    # --- SORTEIO DO 1º LUGAR ---
     with col_p1:
-        st.write(f"**1º Prêmio:** {dados['config']['premio1']}")
+        st.write(f"**1º Prêmio:** {dados['config'].get('premio1', 'Prêmio 1')}")
         if st.button("Sortear 1º Lugar"):
-            # Evita sortear quem já ganhou o 2º ou 3º
-            ganhadores_anteriores = [st.session_state.vencedores.get(x, {}).get("num") for x in ["2", "3"]]
-            lista_filtrada = [n for n in pagos_lista if n not in ganhadores_anteriores]
+            # Filtra para não repetir quem já ganhou o 2º ou 3º
+            ganhadores_outros = [st.session_state.vencedores.get(x, {}).get("num") for x in ["2", "3"]]
+            lista_filtrada = [n for n in pagos_lista if n not in ganhadores_outros]
+            
             if lista_filtrada:
-                res = animar_sorteio(dados['config']['premio1'], lista_filtrada)
+                res = animar_sorteio(dados['config'].get('premio1'), lista_filtrada)
                 st.session_state.vencedores["1"] = {"num": res, "nome": vendas[res]["nome"]}
+                st.rerun()
             else: st.error("Sem números pagos disponíveis.")
+            
         if "1" in st.session_state.vencedores:
             v = st.session_state.vencedores["1"]
-            st.success(f"🥇 Ganhador: {v['num']} - {v['nome']}")
+            st.markdown(f"""
+                <div style="background-color: #f0f2f6; padding: 15px; border-radius: 10px; border-left: 5px solid #ffd700; text-align: center;">
+                    <span style="font-size: 24px;">🥇</span><br>
+                    <b>Número: {v['num']}</b><br>{v['nome']}
+                </div>
+            """, unsafe_allow_html=True)
 
 with tab_stats:
     st.subheader("📊 Estatísticas")
