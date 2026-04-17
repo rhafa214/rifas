@@ -15,21 +15,22 @@ NOME_PLANILHA = "DB_Rifa"
 st.set_page_config(page_title="Rifa Master Pro", layout="wide", page_icon="🏆")
 
 # --- ESTILO CSS (VISUAL PROFISSIONAL) ---
-st.markdown("""
+st.markdown(
+    """
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-    .stMetric { background-color: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #ddd; }
-    .main-title { text-align: center; color: #1E1E1E; font-family: 'Arial Black'; margin-bottom: 0px; }
-    .countdown-box { text-align: center; background: #262730; color: #ffc107; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; }
-    
-    /* Botões WhatsApp */
-    .btn-whatsapp { display: inline-flex; align-items: center; justify-content: center; background-color: #25D366; color: white !important; padding: 10px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; width: 100%; gap: 10px; transition: 0.3s; margin-top: 10px; }
-    .btn-whatsapp:hover { background-color: #128C7E; transform: scale(1.02); text-decoration: none; }
-    
-    /* Botão Compartilhar Grupo */
-    .btn-share { display: inline-flex; align-items: center; justify-content: center; background-color: #007bff; color: white !important; padding: 15px; border-radius: 8px; text-decoration: none; font-weight: bold; width: 100%; gap: 10px; }
+        .stMetric { background-color: #f8f9fa; padding: 15px; border-radius: 10px; border: 1px solid #ddd; }
+        .main-title { text-align: center; color: #1E1E1E; font-family: 'Arial Black'; margin-bottom: 0px; }
+        .countdown-box { text-align: center; background: #262730; color: #ffc107; padding: 15px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; }
+        
+        .btn-whatsapp { display: inline-flex; align-items: center; justify-content: center; background-color: #25D366; color: white !important; padding: 10px 15px; border-radius: 8px; text-decoration: none; font-weight: bold; width: 100%; gap: 10px; transition: 0.3s; margin-top: 10px; }
+        .btn-whatsapp:hover { background-color: #128C7E; transform: scale(1.02); text-decoration: none; }
+        
+        .btn-share { display: inline-flex; align-items: center; justify-content: center; background-color: #007bff; color: white !important; padding: 15px; border-radius: 8px; text-decoration: none; font-weight: bold; width: 100%; gap: 10px; }
     </style>
-    """, unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True
+)
 
 # --- CONEXÃO GOOGLE SHEETS ---
 def conectar():
