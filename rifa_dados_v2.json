@@ -1,0 +1,8 @@
+{
+    "config": {
+        "total_numeros": 100,
+        "preco": 10.0,
+        "data_sorteio": "2026-05-09T20:00:00"
+    },
+    "vendas": {}
+}
