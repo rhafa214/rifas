@@ -197,19 +197,27 @@ tab_mapa, tab_sorteio, tab_stats = st.tabs(["🗺️ Mapa", "🎲 Sorteador", "�
 # ... (Restante do código das abas Mapa, Sorteador e Stats permanece igual ao anterior)
 with tab_mapa:
     st.write("🟢 Pago | 🔴 Pendente | 🟡 Disponível")
-    col_g = st.columns(10)
-    for i in range(1, total_n + 1):
-        ns = str(i)
-        with col_g[(i-1) % 10]:
-            if ns in vendas:
-                v = vendas[ns]
-                cor = "🟢" if v['pago'] else "🔴"
-                with st.popover(f"{i:02d} {cor}", use_container_width=True):
-                    st.write(f"**Dono:** {v['nome']}")
-            else:
-                with st.popover(f"{i:02d} 🟡", use_container_width=True):
-                    st.write("✨ Disponível")
-
+    
+    # Definimos 5 colunas para garantir que no celular não fique tão vertical
+    num_colunas = 5 
+    
+    # Calculamos quantas linhas serão necessárias
+    for i in range(0, total_n, num_colunas):
+        cols = st.columns(num_colunas) # Cria uma nova linha de colunas
+        for j in range(num_colunas):
+            n = i + j + 1 # Calcula o número atual (1, 2, 3...)
+            if n <= total_n:
+                ns = str(n)
+                with cols[j]: # Coloca o número na coluna correta daquela linha
+                    if ns in vendas:
+                        v = vendas[ns]
+                        cor = "🟢" if v['pago'] else "🔴"
+                        with st.popover(f"{n:02d} {cor}", use_container_width=True):
+                            st.write(f"**Dono:** {v['nome']}")
+                            st.write(f"**Status:** {'Pago' if v['pago'] else 'Pendente'}")
+                    else:
+                        with st.popover(f"{n:02d} 🟡", use_container_width=True):
+                            st.write("✨ Disponível")
 with tab_sorteio:
     st.subheader("🎲 Realizar Sorteio")
     if st.button("🗑️ Limpar Ganhadores"):
