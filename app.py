@@ -2,15 +2,26 @@ import streamlit as st
 import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-from datetime import datetime, timedelta
+from datetime import datetime
 import random
 import time
+import urllib.parse
 
 # --- CONFIGURAÇÕES ---
 SENHA_MESTRE = "1234" 
 NOME_PLANILHA = "DB_Rifa"
 
-st.set_page_config(page_title="Gestor de Rifa Master", layout="wide", page_icon="📅")
+st.set_page_config(page_title="Rifa Master Pro", layout="wide", page_icon="🏆")
+
+# --- ESTILO CSS PERSONALIZADO ---
+st.markdown("""
+    <style>
+    .stMetric { background-color: #f0f2f6; padding: 15px; border-radius: 10px; border: 1px solid #ddd; }
+    .main-title { text-align: center; color: #1E1E1E; font-family: 'Arial Black'; margin-bottom: 0px; }
+    .countdown-box { text-align: center; background: #262730; color: #ffc107; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+    div[data-testid="stExpander"] { border: none !important; box-shadow: none !important; }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- CONEXÃO GOOGLE SHEETS ---
 def conectar():
@@ -43,24 +54,22 @@ def carregar_dados():
         conf_list = ws_config.get_all_records()
         if conf_list:
             conf = conf_list[0]
-            # Garantir campos novos incluindo data_sorteio
-            defaults = {"titulo": "Rifa", "premio1": "", "premio2": "", "premio3": "", "data_sorteio": "2024-12-31 20:00:00"}
-            for k, v in defaults.items():
-                if k not in conf: conf[k] = v
+            for p in ["titulo", "premio1", "premio2", "premio3", "data_sorteio"]:
+                if p not in conf: conf[p] = ""
         else:
             conf = {"total_numeros": 100, "preco": 10.0, "titulo": "Rifa", "data_sorteio": "2024-12-31 20:00:00"}
         
         return {"config": conf, "vendas": vendas_dict}
     except Exception as e:
         st.error(f"Erro ao carregar dados: {e}")
-        return {"config": {"total_numeros": 100, "preco": 10.0, "titulo": "Erro", "data_sorteio": "2024-12-31 20:00:00"}, "vendas": {}}
+        return {"config": {"total_numeros": 100, "preco": 10.0, "titulo": "Erro"}, "vendas": {}}
 
-# --- FUNÇÕES DE ATUALIZAÇÃO ---
-def atualizar_venda(numero, novo_nome, novo_pago):
+def atualizar_venda(numero, novo_nome, novo_tel, novo_pago):
     sh = conectar(); ws = sh.worksheet("vendas")
     cel = ws.find(str(numero))
     if cel:
         ws.update_cell(cel.row, 2, novo_nome)
+        ws.update_cell(cel.row, 3, novo_tel)
         ws.update_cell(cel.row, 4, str(novo_pago).upper())
 
 def excluir_venda(numero):
@@ -70,12 +79,9 @@ def excluir_venda(numero):
 
 def atualizar_configuracoes(novo_titulo, novo_total, novo_preco, p1, p2, p3, nova_data):
     sh = conectar(); ws = sh.worksheet("config")
-    ws.update_cell(2, 1, int(novo_total))
-    ws.update_cell(2, 2, float(novo_preco))
-    ws.update_cell(2, 3, str(novo_titulo))
-    ws.update_cell(2, 4, str(p1))
-    ws.update_cell(2, 5, str(p2))
-    ws.update_cell(2, 6, str(p3))
+    ws.update_cell(2, 1, int(novo_total)); ws.update_cell(2, 2, float(novo_preco))
+    ws.update_cell(2, 3, str(novo_titulo)); ws.update_cell(2, 4, str(p1))
+    ws.update_cell(2, 5, str(p2)); ws.update_cell(2, 6, str(p3))
     ws.update_cell(2, 7, str(nova_data))
 
 # --- INICIALIZAÇÃO ---
@@ -86,10 +92,10 @@ if 'vencedores' not in st.session_state: st.session_state.vencedores = {}
 dados = st.session_state.dados
 
 # --- BARRA LATERAL ---
-st.sidebar.title("🔐 Administração")
+st.sidebar.title("🔐 Painel do Dono")
 if not st.session_state.autenticado:
-    senha_in = st.sidebar.text_input("Senha:", type="password")
-    if st.sidebar.button("Acessar Painel"):
+    senha_in = st.sidebar.text_input("Senha Admin:", type="password")
+    if st.sidebar.button("Acessar"):
         if senha_in == SENHA_MESTRE:
             st.session_state.autenticado = True
             st.rerun()
@@ -98,31 +104,35 @@ else:
         st.session_state.autenticado = False
         st.rerun()
     
-    abas_side = st.sidebar.tabs(["📝 Vender", "✏️ Editar", "⚙️ Ajustes"])
+    st.sidebar.divider()
+    aba_s = st.sidebar.tabs(["📝 Venda", "✏️ Editar", "⚙️ Config"])
     
-    with abas_side[0]:
+    with aba_s[0]:
         livres = [n for n in range(1, int(dados["config"]["total_numeros"])+1) if str(n) not in dados["vendas"]]
         with st.form("venda_form", clear_on_submit=True):
             nums = st.multiselect("Números", livres)
             nome_c = st.text_input("Nome")
-            foi_pago = st.checkbox("Pago?")
-            if st.form_submit_button("Registrar"):
+            tel_c = st.text_input("WhatsApp (com DDD)")
+            foi_pago = st.checkbox("Está Pago?")
+            if st.form_submit_button("Confirmar Registro"):
                 if nums and nome_c:
                     sh = conectar(); ws = sh.worksheet("vendas")
                     for n in nums:
-                        ws.append_row([str(n), nome_c, "", str(foi_pago).upper(), datetime.now().strftime("%d/%m/%Y")])
+                        ws.append_row([str(n), nome_c, tel_c, str(foi_pago).upper(), datetime.now().strftime("%d/%m/%Y")])
+                    st.success("Registrado com sucesso!")
                     st.session_state.dados = carregar_dados()
                     st.rerun()
 
-    with abas_side[1]:
+    with aba_s[1]:
         if dados["vendas"]:
-            n_edit = st.selectbox("Número vendido:", sorted(dados["vendas"].keys(), key=int))
+            n_edit = st.selectbox("Número para alterar:", sorted(dados["vendas"].keys(), key=int))
             info = dados["vendas"][n_edit]
-            edit_nome = st.text_input("Nome", value=info['nome'])
-            edit_pago = st.checkbox("Pago", value=info['pago'])
+            e_nome = st.text_input("Nome", value=info['nome'])
+            e_tel = st.text_input("WhatsApp", value=info['tel'])
+            e_pago = st.checkbox("Pago?", value=info['pago'])
             c1, c2 = st.columns(2)
             if c1.button("Salvar"):
-                atualizar_venda(n_edit, edit_nome, edit_pago)
+                atualizar_venda(n_edit, e_nome, e_tel, e_pago)
                 st.session_state.dados = carregar_dados()
                 st.rerun()
             if c2.button("Excluir"):
@@ -130,148 +140,129 @@ else:
                 st.session_state.dados = carregar_dados()
                 st.rerun()
 
-    with abas_side[2]:
-        st.subheader("Configurações")
-        nome_rifa_input = st.text_input("Nome da Rifa", value=dados["config"]["titulo"])
-        total_in = st.number_input("Total de Números", value=int(dados["config"]["total_numeros"]))
-        preco_in = st.number_input("Preço por Número", value=float(dados["config"]["preco"]))
-        
-        # --- EDIÇÃO DA DATA DO SORTEIO ---
-        st.write("**Data do Sorteio:**")
-        try:
-            data_atual_config = datetime.strptime(dados["config"]["data_sorteio"], "%Y-%m-%d %H:%M:%S")
-        except:
-            data_atual_config = datetime.now()
-            
-        nova_data_sorteio = st.date_input("Dia", data_atual_config.date())
-        nova_hora_sorteio = st.time_input("Hora", data_atual_config.time())
-        data_final_str = f"{nova_data_sorteio} {nova_hora_sorteio}"
-        
-        st.write("**Prêmios:**")
-        p1 = st.text_input("1º Prêmio", value=dados["config"].get("premio1", ""))
-        p2 = st.text_input("2º Prêmio", value=dados["config"].get("premio2", ""))
-        p3 = st.text_input("3º Prêmio", value=dados["config"].get("premio3", ""))
-        
+    with aba_s[2]:
+        n_tit = st.text_input("Nome da Rifa", value=dados["config"]["titulo"])
+        n_tot = st.number_input("Qtd Números", value=int(dados["config"]["total_numeros"]))
+        n_pre = st.number_input("Preço R$", value=float(dados["config"]["preco"]))
+        st.write("Data:")
+        d_sort = st.text_input("YYYY-MM-DD HH:MM:SS", value=dados["config"]["data_sorteio"])
+        st.write("Prêmios:")
+        p1 = st.text_input("1º", value=dados["config"].get("premio1"))
+        p2 = st.text_input("2º", value=dados["config"].get("premio2"))
+        p3 = st.text_input("3º", value=dados["config"].get("premio3"))
         if st.button("Atualizar Tudo"):
-            atualizar_configuracoes(nome_rifa_input, total_in, preco_in, p1, p2, p3, data_final_str)
-            st.success("Configurações atualizadas!")
-            st.session_state.dados = carregar_dados()
-            st.rerun()
+            atualizar_configuracoes(n_tit, n_tot, n_pre, p1, p2, p3, d_sort)
+            st.session_state.dados = carregar_dados(); st.rerun()
 
 # --- INTERFACE PRINCIPAL ---
-st.title(f"🎟️ {dados['config']['titulo']}")
+st.markdown(f"<h1 class='main-title'>🎟️ {dados['config']['titulo']}</h1>", unsafe_allow_html=True)
 
-# --- LÓGICA DO CRONÔMETRO ---
+# Cronômetro
 try:
-    data_alvo = datetime.strptime(dados["config"]["data_sorteio"], "%Y-%m-%d %H:%M:%S")
-    agora = datetime.now()
-    diferenca = data_alvo - agora
-
-    if diferenca.total_seconds() > 0:
-        dias = diferenca.days
-        horas, rem = divmod(diferenca.seconds, 3600)
-        minutos, segundos = divmod(rem, 60)
-        st.info(f"⏳ **O sorteio será em:** {dias} dias, {horas}h {minutos}min")
+    alvo = datetime.strptime(dados["config"]["data_sorteio"], "%Y-%m-%d %H:%M:%S")
+    dif = alvo - datetime.now()
+    if dif.total_seconds() > 0:
+        st.markdown(f"<div class='countdown-box'>⏳ Faltam {dif.days} dias e {dif.seconds//3600} horas para o grande sorteio!</div>", unsafe_allow_html=True)
     else:
-        st.error("🏁 **O período de vendas encerrou! Prepare-se para o sorteio.**")
-except:
-    st.warning("⚠️ Data do sorteio não configurada corretamente.")
+        st.markdown("<div class='countdown-box' style='color:red;'>🏁 Vendas Encerradas - Prepare-se para o Sorteio!</div>", unsafe_allow_html=True)
+except: pass
 
 # Métricas
 total_n = int(dados["config"]["total_numeros"])
 vendas = dados["vendas"]
-vendidos = len(vendas)
-pagos_c = sum(1 for v in vendas.values() if v["pago"])
+v_count = len(vendas)
+p_count = sum(1 for v in vendas.values() if v["pago"])
 
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Vendidos", f"{vendidos} ({ (vendidos/total_n)*100 :.1f}%)")
-m2.metric("Faltam Vender", total_n - vendidos)
-m3.metric("Confirmado", f"R$ {pagos_c * float(dados['config']['preco']):.2f}")
-m4.metric("Pendentes", f"R$ {(vendidos - pagos_c) * float(dados['config']['preco']):.2f}")
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Vendidos", f"{v_count} ({(v_count/total_n)*100:.1f}%)")
+c2.metric("Disponíveis", total_n - v_count)
+c3.metric("Confirmado", f"R$ {p_count * float(dados['config']['preco']):.2f}")
+c4.metric("Pendentes", f"R$ {(v_count - p_count) * float(dados['config']['preco']):.2f}")
 
 st.divider()
 
-# ABAS (Mapa, Sorteador, Estatísticas)
-tab_mapa, tab_sorteio, tab_stats = st.tabs(["🗺️ Mapa", "🎲 Sorteador", "📊 Estatísticas"])
+# Busca para Clientes
+st.subheader("🔍 Localizar meus Números")
+busca_cliente = st.text_input("Digite seu nome para ver seus números:", placeholder="Ex: Danilo")
+if busca_cliente:
+    meus_nums = [n for n, v in vendas.items() if busca_cliente.lower() in v['nome'].lower()]
+    if meus_nums:
+        st.success(f"Olá {busca_cliente}, seus números são: **{', '.join(sorted(meus_nums, key=int))}**")
+    else:
+        st.warning("Nenhum número encontrado para este nome.")
 
-# ... (Restante do código das abas Mapa, Sorteador e Stats permanece igual ao anterior)
-with tab_mapa:
-    st.write("🟢 Pago | 🔴 Pendente | 🟡 Disponível")
-    
-    # Definimos 5 colunas para garantir que no celular não fique tão vertical
-    num_colunas = 5 
-    
-    # Calculamos quantas linhas serão necessárias
-    for i in range(0, total_n, num_colunas):
-        cols = st.columns(num_colunas) # Cria uma nova linha de colunas
-        for j in range(num_colunas):
-            n = i + j + 1 # Calcula o número atual (1, 2, 3...)
+# ABAS
+t_mapa, t_sorteio, t_stats = st.tabs(["🗺️ Mapa de Números", "🎲 Sorteador", "📊 Relatórios"])
+
+with t_mapa:
+    st.write("🟢 Pago | 🔴 Pendente | 🟡 Livre")
+    num_cols = 5 if v_count > 0 else 10 # Mobile friendly
+    for i in range(0, total_n, num_cols):
+        cols = st.columns(num_cols)
+        for j in range(num_cols):
+            n = i + j + 1
             if n <= total_n:
                 ns = str(n)
-                with cols[j]: # Coloca o número na coluna correta daquela linha
+                with cols[j]:
                     if ns in vendas:
                         v = vendas[ns]
                         cor = "🟢" if v['pago'] else "🔴"
                         with st.popover(f"{n:02d} {cor}", use_container_width=True):
                             st.write(f"**Dono:** {v['nome']}")
-                            st.write(f"**Status:** {'Pago' if v['pago'] else 'Pendente'}")
+                            # Link WhatsApp (Apenas visível para admin se quiser)
+                            if st.session_state.autenticado and v['tel']:
+                                msg = urllib.parse.quote(f"Olá {v['nome']}, estou confirmando seu número {n} na {dados['config']['titulo']}!")
+                                st.markdown(f"[💬 Chamar no Whats](https://wa.me/55{v['tel']}?text={msg})")
                     else:
                         with st.popover(f"{n:02d} 🟡", use_container_width=True):
                             st.write("✨ Disponível")
-with tab_sorteio:
-    st.subheader("🎲 Realizar Sorteio")
-    if st.button("🗑️ Limpar Ganhadores"):
-        st.session_state.vencedores = {}; st.rerun()
+
+with t_sorteio:
+    st.subheader("🎲 Sorteio Oficial")
+    if st.button("🗑️ Limpar Testes"): st.session_state.vencedores = {}; st.rerun()
     
-    st.divider()
+    def animar(pagos):
+        ph = st.empty()
+        for i in range(3,0,-1): ph.markdown(f"<h1 style='text-align:center;'>{i}</h1>", unsafe_allow_html=True); time.sleep(1)
+        res = random.choice(pagos); st.balloons(); return res
+
+    pagos_l = [n for n, v in vendas.items() if v["pago"]]
     col_p1, col_p2, col_p3 = st.columns(3)
     
-    def animar_sorteio(lista_pagos):
-        ph = st.empty()
-        for i in range(3, 0, -1):
-            ph.markdown(f"<h1 style='text-align:center;'>{i}</h1>", unsafe_allow_html=True); time.sleep(1)
-        res = random.choice(lista_pagos)
-        st.balloons()
-        return res
-
-    pagos_lista = [n for n, v in vendas.items() if v["pago"]]
-
     with col_p3:
-        st.write(f"**3º Prêmio:** {dados['config'].get('premio3')}")
+        st.write(f"3º: {dados['config'].get('premio3')}")
         if st.button("Sortear 3º"):
-            if pagos_lista:
-                r = animar_sorteio(pagos_lista)
-                st.session_state.vencedores["3"] = {"num": r, "nome": vendas[r]["nome"]}; st.rerun()
-        if "3" in st.session_state.vencedores:
-            v = st.session_state.vencedores["3"]
-            st.success(f"🥉 {v['num']} - {v['nome']}")
+            if pagos_l: 
+                r = animar(pagos_l)
+                st.session_state.vencedores["3"] = {"n": r, "nome": vendas[r]["nome"]}; st.rerun()
+        if "3" in st.session_state.vencedores: 
+            st.success(f"🥉 {st.session_state.vencedores['3']['n']} - {st.session_state.vencedores['3']['nome']}")
 
     with col_p2:
-        st.write(f"**2º Prêmio:** {dados['config'].get('premio2')}")
+        st.write(f"2º: {dados['config'].get('premio2')}")
         if st.button("Sortear 2º"):
-            l_f = [n for n in pagos_lista if n != st.session_state.vencedores.get("3", {}).get("num")]
-            if l_f:
-                r = animar_sorteio(l_f)
-                st.session_state.vencedores["2"] = {"num": r, "nome": vendas[r]["nome"]}; st.rerun()
-        if "2" in st.session_state.vencedores:
-            v = st.session_state.vencedores["2"]
-            st.success(f"🥈 {v['num']} - {v['nome']}")
+            lf = [n for n in pagos_l if n != st.session_state.vencedores.get("3",{}).get("n")]
+            if lf: 
+                r = animar(lf)
+                st.session_state.vencedores["2"] = {"n": r, "nome": vendas[r]["nome"]}; st.rerun()
+        if "2" in st.session_state.vencedores: 
+            st.success(f"🥈 {st.session_state.vencedores['2']['n']} - {st.session_state.vencedores['2']['nome']}")
 
     with col_p1:
-        st.write(f"**1º Prêmio:** {dados['config'].get('premio1')}")
+        st.write(f"1º: {dados['config'].get('premio1')}")
         if st.button("Sortear 1º"):
-            l_f = [n for n in pagos_lista if n not in [st.session_state.vencedores.get(x,{}).get("num") for x in ["2","3"]]]
-            if l_f:
-                r = animar_sorteio(l_f)
-                st.session_state.vencedores["1"] = {"num": r, "nome": vendas[r]["nome"]}; st.rerun()
-        if "1" in st.session_state.vencedores:
-            v = st.session_state.vencedores["1"]
-            st.success(f"🥇 {v['num']} - {v['nome']}")
+            lf = [n for n in pagos_l if n not in [st.session_state.vencedores.get(x,{}).get("n") for x in ["2","3"]]]
+            if lf: 
+                r = animar(lf)
+                st.session_state.vencedores["1"] = {"n": r, "nome": vendas[r]["nome"]}; st.rerun()
+        if "1" in st.session_state.vencedores: 
+            st.success(f"🥇 {st.session_state.vencedores['1']['n']} - {st.session_state.vencedores['1']['nome']}")
 
-with tab_stats:
-    st.subheader("📊 Estatísticas")
-    st.progress(vendidos/total_n)
+with t_stats:
+    st.subheader("📊 Relatório Detalhado")
     if vendas:
-        df_v = pd.DataFrame.from_dict(vendas, orient='index').reset_index()
-        df_v.columns = ['Número', 'Nome', 'WhatsApp', 'Pago', 'Data']
-        st.dataframe(df_v.sort_values(by="Número", key=lambda x: x.astype(int)), use_container_width=True)
+        df = pd.DataFrame.from_dict(vendas, orient='index').reset_index()
+        df.columns = ['Nº', 'Nome', 'Zap', 'Pago', 'Data']
+        st.dataframe(df.sort_values(by="Nº", key=lambda x: x.astype(int)), use_container_width=True)
+    st.divider()
+    st.write("**Regras:** O sorteio será realizado na data acima. Números não pagos até 24h antes serão liberados.")
