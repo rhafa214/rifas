@@ -10,7 +10,7 @@ import time
 SENHA_MESTRE = "1234" 
 NOME_PLANILHA = "DB_Rifa"
 
-st.set_page_config(page_title="Gestor de Rifa Pro", layout="wide", page_icon="📊")
+st.set_page_config(page_title="Gestor de Rifa Master", layout="wide", page_icon="🏆")
 
 # --- CONEXÃO GOOGLE SHEETS ---
 def conectar():
@@ -43,14 +43,16 @@ def carregar_dados():
         conf_list = ws_config.get_all_records()
         if conf_list:
             conf = conf_list[0]
-            if "titulo" not in conf: conf["titulo"] = "Minha Rifa"
+            # Garantir campos novos
+            for p in ["titulo", "premio1", "premio2", "premio3"]:
+                if p not in conf: conf[p] = ""
         else:
-            conf = {"total_numeros": 100, "preco": 10.0, "titulo": "Minha Rifa"}
+            conf = {"total_numeros": 100, "preco": 10.0, "titulo": "Rifa", "premio1": "", "premio2": "", "premio3": ""}
         
         return {"config": conf, "vendas": vendas_dict}
     except Exception as e:
         st.error(f"Erro ao carregar dados: {e}")
-        return {"config": {"total_numeros": 100, "preco": 10.0, "titulo": "Rifa Master"}, "vendas": {}}
+        return {"config": {"total_numeros": 100, "preco": 10.0, "titulo": "Erro", "premio1": "", "premio2": "", "premio3": ""}, "vendas": {}}
 
 # --- FUNÇÕES DE ATUALIZAÇÃO ---
 def atualizar_venda(numero, novo_nome, novo_pago):
@@ -65,18 +67,19 @@ def excluir_venda(numero):
     cel = ws.find(str(numero))
     if cel: ws.delete_rows(cel.row)
 
-def atualizar_configuracoes(novo_titulo, novo_total, novo_preco):
+def atualizar_configuracoes(novo_titulo, novo_total, novo_preco, p1, p2, p3):
     sh = conectar(); ws = sh.worksheet("config")
     ws.update_cell(2, 1, int(novo_total))
     ws.update_cell(2, 2, float(novo_preco))
     ws.update_cell(2, 3, str(novo_titulo))
+    ws.update_cell(2, 4, str(p1))
+    ws.update_cell(2, 5, str(p2))
+    ws.update_cell(2, 6, str(p3))
 
 # --- INICIALIZAÇÃO ---
-if 'autenticado' not in st.session_state:
-    st.session_state.autenticado = False
-
-if 'dados' not in st.session_state:
-    st.session_state.dados = carregar_dados()
+if 'autenticado' not in st.session_state: st.session_state.autenticado = False
+if 'dados' not in st.session_state: st.session_state.dados = carregar_dados()
+if 'vencedores' not in st.session_state: st.session_state.vencedores = {}
 
 dados = st.session_state.dados
 
@@ -88,14 +91,11 @@ if not st.session_state.autenticado:
         if senha_in == SENHA_MESTRE:
             st.session_state.autenticado = True
             st.rerun()
-        else:
-            st.sidebar.error("Senha incorreta!")
 else:
     if st.sidebar.button("🚪 Sair do Painel"):
         st.session_state.autenticado = False
         st.rerun()
     
-    st.sidebar.divider()
     abas_side = st.sidebar.tabs(["📝 Vender", "✏️ Editar", "⚙️ Ajustes"])
     
     with abas_side[0]:
@@ -133,11 +133,17 @@ else:
         nome_rifa_input = st.text_input("Nome da Rifa", value=dados["config"]["titulo"])
         total_in = st.number_input("Total de Números", value=int(dados["config"]["total_numeros"]))
         preco_in = st.number_input("Preço por Número", value=float(dados["config"]["preco"]))
-        if st.button("Atualizar Rifa"):
-            atualizar_configuracoes(nome_rifa_input, total_in, preco_in)
+        st.write("**Defina os Prêmios:**")
+        p1 = st.text_input("1º Prêmio", value=dados["config"]["premio1"])
+        p2 = st.text_input("2º Prêmio", value=dados["config"]["premio2"])
+        p3 = st.text_input("3º Prêmio", value=dados["config"]["premio3"])
+        
+        if st.button("Atualizar Tudo"):
+            atualizar_configuracoes(nome_rifa_input, total_in, preco_in, p1, p2, p3)
             st.success("Configurações atualizadas!")
             st.session_state.dados = carregar_dados()
             st.rerun()
+        
         st.divider()
         if st.checkbox("Liberar Reset"):
             if st.button("🔴 ZERAR TUDO"):
@@ -149,38 +155,32 @@ else:
 # --- INTERFACE PRINCIPAL ---
 st.title(f"🎟️ {dados['config']['titulo']}")
 
-# --- CÁLCULOS PARA O DASHBOARD ---
-total_numeros = int(dados["config"]["total_numeros"])
+# Dashboard Simples
+total_n = int(dados["config"]["total_numeros"])
 vendas = dados["vendas"]
-total_vendidos = len(vendas)
-faltam_vender = total_numeros - total_vendidos
-porcentagem_vendas = (total_vendidos / total_numeros) * 100
+vendidos = len(vendas)
+faltam = total_n - vendidos
+pagos_c = sum(1 for v in vendas.values() if v["pago"])
 
-pagos_count = sum(1 for v in vendas.values() if v["pago"])
-preco_unit = float(dados["config"]["preco"])
-arrecadado_pago = pagos_count * preco_unit
-arrecadado_pendente = (total_vendidos - pagos_count) * preco_unit
-
-# --- MÉTRICAS PRINCIPAIS ---
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Vendidos", f"{total_vendidos} ({porcentagem_vendas:.1f}%)")
-c2.metric("Faltam Vender", faltam_vender)
-c3.metric("Dinheiro em Caixa", f"R$ {arrecadado_pago:.2f}")
-c4.metric("A Receber", f"R$ {arrecadado_pendente:.2f}")
+m1, m2, m3, m4 = st.columns(4)
+m1.metric("Vendidos", f"{vendidos} ({ (vendidos/total_n)*100 :.1f}%)")
+m2.metric("Faltam Vender", faltam)
+m3.metric("Confirmado", f"R$ {pagos_c * float(dados['config']['preco']):.2f}")
+m4.metric("Pendentes", f"R$ {(vendidos - pagos_c) * float(dados['config']['preco']):.2f}")
 
 st.divider()
 
-# --- ABAS PRINCIPAIS ---
-tab_mapa, tab_stats, tab_sorteio = st.tabs(["🗺️ Mapa de Números", "📊 Estatísticas Detalhadas", "🎲 Realizar Sorteio"])
+# ABAS
+tab_mapa, tab_sorteio, tab_stats = st.tabs(["🗺️ Mapa", "🎲 Sorteador", "📊 Estatísticas"])
 
 with tab_mapa:
     st.write("🟢 Pago | 🔴 Pendente | 🟡 Disponível")
-    col_grade = st.columns(10)
-    for i in range(1, total_numeros + 1):
-        n_s = str(i)
-        with col_grade[(i-1) % 10]:
-            if n_s in vendas:
-                v = vendas[n_s]
+    col_g = st.columns(10)
+    for i in range(1, total_n + 1):
+        ns = str(i)
+        with col_g[(i-1) % 10]:
+            if ns in vendas:
+                v = vendas[ns]
                 cor = "🟢" if v['pago'] else "🔴"
                 with st.popover(f"{i:02d} {cor}", use_container_width=True):
                     st.write(f"**Dono:** {v['nome']}")
@@ -188,57 +188,75 @@ with tab_mapa:
                 with st.popover(f"{i:02d} 🟡", use_container_width=True):
                     st.write("✨ Disponível")
 
-with tab_stats:
-    st.subheader("📈 Desempenho da Rifa")
-    
-    col_st1, col_st2 = st.columns(2)
-    
-    with col_st1:
-        st.write("**Progresso de Vendas**")
-        st.progress(porcentagem_vendas / 100)
-        
-        # Gráfico Simples de Vendas
-        chart_data = pd.DataFrame({
-            "Status": ["Vendidos", "Restantes"],
-            "Quantidade": [total_vendidos, faltam_vender]
-        })
-        st.bar_chart(chart_data.set_index("Status"))
-
-    with col_st2:
-        st.write("**Resumo Financeiro**")
-        finance_data = pd.DataFrame({
-            "Financeiro": ["Em Caixa", "Pendente"],
-            "Valor (R$)": [arrecadado_pago, arrecadado_pendente]
-        })
-        st.bar_chart(finance_data.set_index("Financeiro"), color="#28a745")
-
-    st.divider()
-    st.write("**Lista de Vendas Recentes**")
-    if vendas:
-        df_vendas = pd.DataFrame.from_dict(vendas, orient='index').reset_index()
-        df_vendas.columns = ['Número', 'Nome', 'WhatsApp', 'Pago', 'Data']
-        st.dataframe(df_vendas.sort_values(by="Número", key=lambda x: x.astype(int)), use_container_width=True)
-
 with tab_sorteio:
-    st.subheader("🎲 Sorteador")
-    st.write("Apenas números **PAGOS (Verdes)** participam do sorteio.")
-    if st.button("🚀 INICIAR SORTEIO AGORA", use_container_width=True):
-        plista = [n for n, v in vendas.items() if v["pago"]]
-        if plista:
-            ph = st.empty()
-            for i in range(3, 0, -1):
-                ph.markdown(f"<h1 style='text-align:center; font-size:100px;'>{i}</h1>", unsafe_allow_html=True); time.sleep(1)
-            for _ in range(15):
-                ph.markdown(f"<h1 style='text-align:center; font-size:100px;'>{random.randint(1, total_numeros):02d}</h1>", unsafe_allow_html=True); time.sleep(0.1)
-            
-            ganhador = random.choice(plista)
-            st.balloons()
-            ph.markdown(f"""
-                <div style="text-align: center; background-color: #28a745; padding: 40px; border-radius: 20px; color: white;">
-                    <h2 style="margin:0;">🏆 TEMOS UM GANHADOR!</h2>
-                    <h1 style="font-size: 120px; margin:0;">{int(ganhador):02d}</h1>
-                    <h3 style="margin:0;">👤 {vendas[ganhador]['nome']}</h3>
-                </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.error("Não há nenhum número pago para sortear!")
+    st.subheader("🎲 Realizar Sorteio")
+    st.info("O sistema sorteia apenas entre os números PAGOS (Verdes).")
+    
+    col_p1, col_p2, col_p3 = st.columns(3)
+    
+    # Função interna para animar sorteio
+    def animar_sorteio(premio_nome, lista_pagos):
+        ph = st.empty()
+        for i in range(3, 0, -1):
+            ph.markdown(f"<h1 style='text-align:center;'>{i}</h1>", unsafe_allow_html=True); time.sleep(1)
+        for _ in range(15):
+            ph.markdown(f"<h1 style='text-align:center;'>{random.randint(1, total_n):02d}</h1>", unsafe_allow_html=True); time.sleep(0.1)
+        
+        ganhador_num = random.choice(lista_pagos)
+        st.balloons()
+        return ganhador_num
+
+    pagos_lista = [n for n, v in vendas.items() if v["pago"]]
+
+    with col_p3: # 3º lugar primeiro
+        st.write(f"**3º Prêmio:** {dados['config']['premio3']}")
+        if st.button("Sortear 3º Lugar"):
+            if pagos_lista:
+                res = animar_sorteio(dados['config']['premio3'], pagos_lista)
+                st.session_state.vencedores["3"] = {"num": res, "nome": vendas[res]["nome"]}
+            else: st.error("Sem números pagos.")
+        if "3" in st.session_state.vencedores:
+            v = st.session_state.vencedores["3"]
+            st.success(f"🥉 Ganhador: {v['num']} - {v['nome']}")
+
+    with col_p2:
+        st.write(f"**2º Prêmio:** {dados['config']['premio2']}")
+        if st.button("Sortear 2º Lugar"):
+            # Evita sortear o mesmo número se já ganhou o 3º
+            lista_filtrada = [n for n in pagos_lista if n != st.session_state.vencedores.get("3", {}).get("num")]
+            if lista_filtrada:
+                res = animar_sorteio(dados['config']['premio2'], lista_filtrada)
+                st.session_state.vencedores["2"] = {"num": res, "nome": vendas[res]["nome"]}
+            else: st.error("Sem números pagos disponíveis.")
+        if "2" in st.session_state.vencedores:
+            v = st.session_state.vencedores["2"]
+            st.success(f"🥈 Ganhador: {v['num']} - {v['nome']}")
+
+    with col_p1:
+        st.write(f"**1º Prêmio:** {dados['config']['premio1']}")
+        if st.button("Sortear 1º Lugar"):
+            # Evita sortear quem já ganhou o 2º ou 3º
+            ganhadores_anteriores = [st.session_state.vencedores.get(x, {}).get("num") for x in ["2", "3"]]
+            lista_filtrada = [n for n in pagos_lista if n not in ganhadores_anteriores]
+            if lista_filtrada:
+                res = animar_sorteio(dados['config']['premio1'], lista_filtrada)
+                st.session_state.vencedores["1"] = {"num": res, "nome": vendas[res]["nome"]}
+            else: st.error("Sem números pagos disponíveis.")
+        if "1" in st.session_state.vencedores:
+            v = st.session_state.vencedores["1"]
+            st.success(f"🥇 Ganhador: {v['num']} - {v['nome']}")
+
+with tab_stats:
+    st.subheader("📊 Estatísticas")
+    st.progress(vendidos/total_n)
+    st.write(f"Progresso total: **{ (vendidos/total_n)*100 :.1f}%**")
+    
+    st.bar_chart(pd.DataFrame({
+        "Status": ["Vendidos", "Faltam"],
+        "Qtd": [vendidos, faltam]
+    }).set_index("Status"))
+    
+    if vendas:
+        df_v = pd.DataFrame.from_dict(vendas, orient='index').reset_index()
+        df_v.columns = ['Número', 'Nome', 'WhatsApp', 'Pago', 'Data']
+        st.dataframe(df_v.sort_values(by="Número", key=lambda x: x.astype(int)), use_container_width=True)
