@@ -7,6 +7,8 @@ import random
 import time
 import urllib.parse
 import re
+from PIL import Image, ImageDraw, ImageFont
+import io
 
 # --- CONFIGURAÇÕES DE ACESSO ---
 SENHA_MESTRE = "1234" 
@@ -163,6 +165,87 @@ else:
                 sh = conectar(); ws = sh.worksheet("vendas"); ws.clear()
                 ws.append_row(["numero", "nome", "tel", "pago", "data"]); st.rerun()
 
+def gerar_imagem_rifa(dados_vendas, total_n, titulo):
+    # Configurações de estilo
+    largura = 1000
+    altura_header = 150
+    tamanho_quadrado = 80
+    espacamento = 15
+    colunas = 10
+    linhas = (total_n // colunas) + (1 if total_n % colunas != 0 else 0)
+    
+    altura_grid = linhas * (tamanho_quadrado + espacamento) + 50
+    # Calcula altura extra para a lista de nomes (30px por nome ocupado)
+    altura_lista = len(dados_vendas) * 30 + 100
+    
+    largura_total = largura
+    altura_total = altura_header + altura_grid + altura_lista
+    
+    # Criar fundo branco
+    img = Image.new('RGB', (largura_total, altura_total), color=(255, 255, 255))
+    draw = ImageDraw.Draw(img)
+    
+    # Título
+    try:
+        font_titulo = ImageFont.truetype("arial.ttf", 50)
+        font_corpo = ImageFont.truetype("arial.ttf", 25)
+        font_mini = ImageFont.truetype("arial.ttf", 18)
+    except:
+        font_titulo = ImageFont.load_default()
+        font_corpo = ImageFont.load_default()
+        font_mini = ImageFont.load_default()
+
+    # Desenhar Cabeçalho
+    draw.rectangle([0, 0, largura_total, altura_header], fill="#1E1E1E")
+    draw.text((largura_total//2, 50), titulo, fill="#FFC107", font=font_titulo, anchor="mm")
+    draw.text((largura_total//2, 110), f"Status em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", fill="white", font=font_mini, anchor="mm")
+
+    # Desenhar Grid
+    x_inicial = (largura_total - (colunas * (tamanho_quadrado + espacamento))) // 2
+    y_inicial = altura_header + 40
+    
+    for i in range(total_n):
+        num = i + 1
+        col = i % colunas
+        lin = i // colunas
+        
+        x = x_inicial + col * (tamanho_quadrado + espacamento)
+        y = y_inicial + lin * (tamanho_quadrado + espacamento)
+        
+        # Cor baseada no status
+        status = str(num)
+        cor_fundo = "#E0E0E0" # Disponível
+        cor_texto = "black"
+        
+        if status in dados_vendas:
+            if dados_vendas[status]['pago']:
+                cor_fundo = "#28a745" # Pago (Verde)
+                cor_texto = "white"
+            else:
+                cor_fundo = "#dc3545" # Pendente (Vermelho)
+                cor_texto = "white"
+        
+        # Desenhar quadrado arredondado (simulado)
+        draw.rectangle([x, y, x + tamanho_quadrado, y + tamanho_quadrado], fill=cor_fundo)
+        draw.text((x + tamanho_quadrado//2, y + tamanho_quadrado//2), f"{num:02d}", fill=cor_texto, font=font_corpo, anchor="mm")
+
+    # Desenhar Lista de Nomes abaixo do Grid
+    y_lista = y_inicial + altura_grid
+    draw.text((50, y_lista), "Nomes e Números:", fill="black", font=font_corpo)
+    
+    y_item = y_lista + 40
+    for num_venda in sorted(dados_vendas.keys(), key=int):
+        v = dados_vendas[num_venda]
+        status_txt = "✅" if v['pago'] else "⏳"
+        txt = f"{status_txt} Nº {num_venda}: {v['nome'][:30]}"
+        draw.text((50, y_item), txt, fill="black", font=font_mini)
+        y_item += 25
+
+    # Retornar imagem para o Streamlit
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
 # --- INTERFACE PRINCIPAL ---
 st.markdown(f"<h1 class='main-title'>🎟️ {dados['config']['titulo']}</h1>", unsafe_allow_html=True)
 
@@ -253,22 +336,38 @@ with t_sorteio:
                 r = animar(lf); st.session_state.vencedores["1"] = {"n": r, "nome": vendas[r]["nome"]}; st.rerun()
         if "1" in st.session_state.vencedores: 
             v = st.session_state.vencedores["1"]; st.success(f"🥇 {v['n']} - {v['nome']}")
-
 with t_share:
-    st.subheader("📢 Resumo para Grupo")
+    st.subheader("📢 Gerar Card de Divulgação")
+    
+    if st.button("🖼️ Gerar Imagem Atualizada"):
+        with st.spinner("Criando imagem mágica..."):
+            img_bytes = gerar_imagem_rifa(vendas, total_n, dados['config']['titulo'])
+            
+            # Preview da imagem
+            st.image(img_bytes, caption="Visualize como ficará no WhatsApp", use_container_width=True)
+            
+            # Botão de Download
+            st.download_button(
+                label="📥 Baixar Imagem para Compartilhar",
+                data=img_bytes,
+                file_name=f"rifa_{datetime.now().strftime('%d_%m_%H%M')}.png",
+                mime="image/png"
+            )
+            
+            st.info("💡 Dica: Após baixar, envie a imagem no grupo e cole o texto abaixo na legenda!")
+
+    st.divider()
+    
+    # Texto de apoio (Legenda)
     pendentes = [f"❌ Nº {n}: {v['nome']}" for n, v in vendas.items() if not v['pago']]
     prog = "🟢" * int((v_count/total_n)*10) + "⚪" * (10 - int((v_count/total_n)*10))
     
     txt = f"*📊 ATUALIZAÇÃO: {dados['config']['titulo']}*\n\n"
     txt += f"📈 *Progresso:* {prog} ({int((v_count/total_n)*100)}%)\n"
-    txt += f"✅ Vendidos: {v_count}/{total_n}\n⏳ Restantes: {total_n - v_count}\n\n"
-    if pendentes:
-        txt += "*⚠️ AGUARDANDO PAGAMENTO:*\n" + "\n".join(pendentes[:10]) + (f"\n...e mais {len(pendentes)-10}" if len(pendentes)>10 else "") + "\n\n"
-    txt += "🔗 *Link do Site:* https://sua-rifa.streamlit.app"
+    txt += f"✅ Vendidos: {v_count}/{total_n}\n"
+    txt += f"🔗 Reserve aqui: https://sua-rifa.streamlit.app"
     
-    st.text_area("Copie o texto:", value=txt, height=200)
-    msg_u = urllib.parse.quote(txt)
-    st.markdown(f'<a href="https://wa.me/?text={msg_u}" target="_blank" class="btn-share"><i class="fab fa-whatsapp"></i> Postar no Grupo</a>', unsafe_allow_html=True)
+    st.text_area("Legenda sugerida:", value=txt, height=150)
 
 with t_stats:
     st.subheader("📋 Relatório Geral")
