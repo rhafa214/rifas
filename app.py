@@ -169,6 +169,7 @@ else:
 # ---- Gerador de imagem -----#
 def gerar_imagem_rifa(dados_vendas, total_n, titulo):
     # --- CONFIGURAÇÃO DE DIMENSÕES (Focado em proporção para celular) ---
+    escala = 2
     largura = 1200
     margem = 50
     colunas_grid = 10
