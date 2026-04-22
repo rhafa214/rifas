@@ -372,39 +372,60 @@ with t_sorteio:
 with t_share:
     st.subheader("📢 Gerar Card de Divulgação")
     
-    if st.button("🖼️ Gerar Imagem Atualizada"):
-        with st.spinner("Criando imagem mágica..."):
+    # Cálculos para o texto
+    v_count = len(vendas)
+    p_count = sum(1 for v in vendas.values() if v.get('pago'))
+    pendentes_pg = v_count - p_count
+    restantes = total_n - v_count
+    percentual = int((v_count / total_n) * 100)
+    
+    if st.button("🖼️ Gerar Imagem Ultra-HD"):
+        with st.spinner("Criando imagem de alta resolução..."):
             img_bytes = gerar_imagem_rifa(vendas, total_n, dados['config']['titulo'])
             
-            # Preview da imagem
-            st.image(img_bytes, caption="Visualize como ficará no WhatsApp", use_container_width=True)
+            # Preview
+            st.image(img_bytes, caption="Mapa da Rifa (Alta Resolução)", output_format="PNG", use_container_width=True)
             
-            # Botão de Download
+            # Download
             st.download_button(
                 label="📥 Baixar Imagem para Compartilhar",
                 data=img_bytes,
-                file_name=f"rifa_{datetime.now().strftime('%d_%m_%H%M')}.png",
+                file_name=f"rifa_atualizada_{datetime.now().strftime('%d_%m_%H%M')}.png",
                 mime="image/png"
             )
-            
-            st.info("💡 Dica: Após baixar, envie a imagem no grupo e cole o texto abaixo na legenda!")
 
     st.divider()
     
-    # Texto de apoio (Legenda)
-    pendentes = [f"❌ Nº {n}: {v['nome']}" for n, v in vendas.items() if not v['pago']]
-    prog = "🟢" * int((v_count/total_n)*10) + "⚪" * (10 - int((v_count/total_n)*10))
+    # --- CONSTRUÇÃO DO TEXTO PARA WHATSAPP ---
+    prog = "🟢" * (percentual // 10) + "⚪" * (10 - (percentual // 10))
     
     txt = f"*📊 ATUALIZAÇÃO: {dados['config']['titulo']}*\n\n"
-    txt += f"📈 *Progresso:* {prog} ({int((v_count/total_n)*100)}%)\n"
-    txt += f"✅ Vendidos: {v_count}/{total_n}\n"
-    txt += f"🔗 Reserve aqui: https://sua-rifa.streamlit.app"
+    txt += f"📈 *Progresso:* {prog} ({percentual}%)\n\n"
     
-    st.text_area("Legenda sugerida:", value=txt, height=150)
+    txt += f"✅ *Total Vendidos:* {v_count}\n"
+    txt += f"💰 *Pagos:* {p_count}\n"
+    txt += f"⏳ *Faltam Pagar:* {pendentes_pg}\n"
+    txt += f"🟡 *Ainda Disponíveis:* {restantes}\n\n"
+    
+    # Adiciona uma lista rápida de quem ainda não pagou (limitado a 10 para o texto não ficar gigante)
+    lista_pendentes = [f"• Nº {n}: {v['nome']}" for n, v in vendas.items() if not v.get('pago')]
+    if lista_pendentes:
+        txt += "*⚠️ AGUARDANDO PAGAMENTO:* \n"
+        txt += "\n".join(lista_pendentes[:10])
+        if len(lista_pendentes) > 10:
+            txt += f"\n_... e outros {len(lista_pendentes)-10} números_"
+        txt += "\n\n"
+    
+    txt += "🔗 *Reserve o seu aqui:* https://sua-rifa.streamlit.app"
+    # -----------------------------------------
 
-with t_stats:
-    st.subheader("📋 Relatório Geral")
-    if vendas:
-        df = pd.DataFrame.from_dict(vendas, orient='index').reset_index()
-        df.columns = ['Nº', 'Nome', 'WhatsApp', 'Pago', 'Data']
-        st.dataframe(df.sort_values(by="Nº", key=lambda x: x.astype(int)), use_container_width=True)
+    st.write("📝 **Legenda para copiar:**")
+    st.text_area("Copie o texto abaixo:", value=txt, height=250)
+    
+    # Botão de compartilhar direto
+    msg_u = urllib.parse.quote(txt)
+    st.markdown(f'''
+        <a href="https://wa.me/?text={msg_u}" target="_blank" class="btn-share">
+            <i class="fab fa-whatsapp"></i> Compartilhar no Grupo
+        </a>
+    ''', unsafe_allow_html=True)
