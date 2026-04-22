@@ -165,44 +165,71 @@ else:
                 sh = conectar(); ws = sh.worksheet("vendas"); ws.clear()
                 ws.append_row(["numero", "nome", "tel", "pago", "data"]); st.rerun()
 
+
+# ---- Gerador de imagem -----#
 def gerar_imagem_rifa(dados_vendas, total_n, titulo):
-    # Configurações de estilo
-    largura = 1000
-    altura_header = 150
-    tamanho_quadrado = 80
-    espacamento = 15
+    # --- CONFIGURAÇÕES DE ALTA RESOLUÇÃO ---
+    escala = 2  # Aumenta a densidade de pixels (2x)
+    largura = 1200 * escala
+    margem = 60 * escala
+    tamanho_quadrado = 100 * escala
+    espacamento = 20 * escala
     colunas = 10
+    
+    # Cálculo dinâmico da altura
     linhas = (total_n // colunas) + (1 if total_n % colunas != 0 else 0)
+    altura_header = 200 * escala
+    altura_grid = linhas * (tamanho_quadrado + espacamento) + (50 * escala)
+    altura_legenda = 120 * escala
     
-    altura_grid = linhas * (tamanho_quadrado + espacamento) + 50
-    # Calcula altura extra para a lista de nomes (30px por nome ocupado)
-    altura_lista = len(dados_vendas) * 30 + 100
+    # Se houver muitos nomes, a imagem cresce para baixo
+    lista_nomes = sorted(dados_vendas.items(), key=lambda x: int(x[0]))
+    altura_lista = (len(lista_nomes) * 35 * escala) + (100 * escala)
     
-    largura_total = largura
-    altura_total = altura_header + altura_grid + altura_lista
+    altura_total = altura_header + altura_grid + altura_legenda + altura_lista
     
-    # Criar fundo branco
-    img = Image.new('RGB', (largura_total, altura_total), color=(255, 255, 255))
+    # Criar imagem com fundo escuro elegante (ou branco, se preferir)
+    cor_fundo_canvas = "#F8F9FA" 
+    img = Image.new('RGB', (largura, altura_total), color=cor_fundo_canvas)
     draw = ImageDraw.Draw(img)
-    
-    # Título
-    try:
-        font_titulo = ImageFont.truetype("arial.ttf", 50)
-        font_corpo = ImageFont.truetype("arial.ttf", 25)
-        font_mini = ImageFont.truetype("arial.ttf", 18)
-    except:
-        font_titulo = ImageFont.load_default()
-        font_corpo = ImageFont.load_default()
-        font_mini = ImageFont.load_default()
 
-    # Desenhar Cabeçalho
-    draw.rectangle([0, 0, largura_total, altura_header], fill="#1E1E1E")
-    draw.text((largura_total//2, 50), titulo, fill="#FFC107", font=font_titulo, anchor="mm")
-    draw.text((largura_total//2, 110), f"Status em: {datetime.now().strftime('%d/%m/%Y %H:%M')}", fill="white", font=font_mini, anchor="mm")
+    # --- CARREGAMENTO DE FONTE ROBUSTO ---
+    def get_font(size):
+        # Tenta carregar fontes comuns em servidores Linux (Streamlit Cloud) ou Windows
+        fontes = [
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "C:\\Windows\\Fonts\\arialbd.ttf",
+            "arial.ttf"
+        ]
+        for f in fontes:
+            try: return ImageFont.truetype(f, size * escala)
+            except: continue
+        return ImageFont.load_default()
 
-    # Desenhar Grid
-    x_inicial = (largura_total - (colunas * (tamanho_quadrado + espacamento))) // 2
-    y_inicial = altura_header + 40
+    f_titulo = get_font(55)
+    f_subtitulo = get_font(25)
+    f_numero = get_font(32)
+    f_lista = get_font(22)
+    f_legenda = get_font(24)
+
+    # --- CABEÇALHO ---
+    draw.rectangle([0, 0, largura, altura_header], fill="#1E1E1E")
+    draw.text((largura//2, 80 * escala), titulo.upper(), fill="#FFC107", font=f_titulo, anchor="mm")
+    draw.text((largura//2, 140 * escala), f"STATUS DAS RESERVAS - {datetime.now().strftime('%d/%m/%Y %H:%M')}", fill="#FFFFFF", font=f_subtitulo, anchor="mm")
+
+    # --- LEGENDA RÁPIDA ---
+    y_leg = altura_header + (30 * escala)
+    labels = [("#28a745", "PAGO"), ("#dc3545", "RESERVADO"), ("#ADB5BD", "LIVRE")]
+    x_leg = margem
+    for cor, texto in labels:
+        draw.rectangle([x_leg, y_leg, x_leg + (30*escala), y_leg + (30*escala)], fill=cor)
+        draw.text((x_leg + (40*escala), y_leg + (15*escala)), texto, fill="#333333", font=f_legenda, anchor="lm")
+        x_leg += 250 * escala
+
+    # --- GRID DE NÚMEROS ---
+    x_inicial = (largura - (colunas * (tamanho_quadrado + espacamento) - espacamento)) // 2
+    y_inicial = y_leg + (80 * escala)
     
     for i in range(total_n):
         num = i + 1
@@ -212,38 +239,50 @@ def gerar_imagem_rifa(dados_vendas, total_n, titulo):
         x = x_inicial + col * (tamanho_quadrado + espacamento)
         y = y_inicial + lin * (tamanho_quadrado + espacamento)
         
-        # Cor baseada no status
-        status = str(num)
-        cor_fundo = "#E0E0E0" # Disponível
-        cor_texto = "black"
+        # Lógica de cores
+        n_str = str(num)
+        cor_quadrado = "#ADB5BD" # Livre
+        cor_texto = "#FFFFFF"
         
-        if status in dados_vendas:
-            if dados_vendas[status]['pago']:
-                cor_fundo = "#28a745" # Pago (Verde)
-                cor_texto = "white"
+        if n_str in dados_vendas:
+            if dados_vendas[n_str].get('pago'):
+                cor_quadrado = "#28a745" # Pago
             else:
-                cor_fundo = "#dc3545" # Pendente (Vermelho)
-                cor_texto = "white"
+                cor_quadrado = "#dc3545" # Pendente
         
-        # Desenhar quadrado arredondado (simulado)
-        draw.rectangle([x, y, x + tamanho_quadrado, y + tamanho_quadrado], fill=cor_fundo)
-        draw.text((x + tamanho_quadrado//2, y + tamanho_quadrado//2), f"{num:02d}", fill=cor_texto, font=font_corpo, anchor="mm")
+        # Desenhar Quadrado com bordas levemente arredondadas (via retângulo)
+        draw.rectangle([x, y, x + tamanho_quadrado, y + tamanho_quadrado], fill=cor_quadrado, outline="#FFFFFF", width=2*escala)
+        
+        # Número centralizado
+        draw.text((x + tamanho_quadrado//2, y + tamanho_quadrado//2), f"{num:02d}", fill=cor_texto, font=f_numero, anchor="mm")
 
-    # Desenhar Lista de Nomes abaixo do Grid
-    y_lista = y_inicial + altura_grid
-    draw.text((50, y_lista), "Nomes e Números:", fill="black", font=font_corpo)
+    # --- LISTA DE NOMES (DETALHAMENTO) ---
+    y_lista_topo = y_inicial + altura_grid
+    draw.rectangle([margem, y_lista_topo, largura-margem, y_lista_topo + (5*escala)], fill="#1E1E1E")
+    draw.text((margem, y_lista_topo + (40 * escala)), "RELAÇÃO DE PARTICIPANTES:", fill="#1E1E1E", font=f_legenda)
     
-    y_item = y_lista + 40
-    for num_venda in sorted(dados_vendas.keys(), key=int):
-        v = dados_vendas[num_venda]
-        status_txt = "✅" if v['pago'] else "⏳"
-        txt = f"{status_txt} Nº {num_venda}: {v['nome'][:30]}"
-        draw.text((50, y_item), txt, fill="black", font=font_mini)
-        y_item += 25
+    y_item = y_lista_topo + (90 * escala)
+    
+    # Organiza em duas colunas se a lista for grande
+    col_vendas = 0
+    x_item = margem
+    for n_venda, v in lista_nomes:
+        status_simbolo = "✔️" if v.get('pago') else "⌛"
+        txt_venda = f"{n_venda:0>2} - {v['nome'][:25]}"
+        
+        # Desenha o marcador de status
+        draw.text((x_item, y_item), status_simbolo, fill="#000", font=f_lista)
+        draw.text((x_item + (40*escala), y_item), txt_venda, fill="#333", font=f_lista)
+        
+        y_item += 35 * escala
+        # Se chegar perto do fim da página ou muitos itens, poderia colunar (opcional)
+        # Aqui vamos manter linear para garantir leitura.
 
-    # Retornar imagem para o Streamlit
+    # --- FINALIZAÇÃO ---
+    # Converter para RGB antes de salvar (garantia para PNG)
+    img = img.convert('RGB')
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
+    img.save(buf, format="PNG", optimize=True, quality=100)
     return buf.getvalue()
 
 # --- INTERFACE PRINCIPAL ---
