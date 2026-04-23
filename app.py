@@ -307,7 +307,9 @@ c4.metric("A Receber", f"R$ {(v_count - p_count) * float(dados['config']['preco'
 st.divider()
 
 # Abas Principais
-t_mapa, t_sorteio, t_share, t_stats = st.tabs(["🗺️ Mapa", "🎲 Sorteador", "📢 Divulgação", "📊 Relatório"])
+t_mapa, t_sorteio, t_share, t_stats, t_pendentes = st.tabs([
+    "🗺️ Mapa", "🎲 Sorteador", "📢 Divulgação", "📊 Relatório", "⚠️ Pendentes"
+])
 
 with t_mapa:
     st.write("🟢 Pago | 🔴 Pendente | 🟡 Disponível")
@@ -429,3 +431,62 @@ with t_share:
             <i class="fab fa-whatsapp"></i> Compartilhar no Grupo
         </a>
     ''', unsafe_allow_html=True)
+with t_pendentes:
+    st.subheader("📋 Gestão de Cobrança")
+    
+    # Filtrar apenas quem NÃO pagou
+    pendentes_dict = {n: v for n, v in vendas.items() if not v.get('pago')}
+    
+    if not pendentes_dict:
+        st.success("🎉 Sensacional! Todos os números reservados já foram pagos!")
+    else:
+        col_list, col_msg = st.columns([1.5, 1])
+        
+        with col_list:
+            st.write(f"Existem **{len(pendentes_dict)}** números aguardando pagamento.")
+            
+            # Criar uma tabela interativa ou lista com botões
+            for n_pendente in sorted(pendentes_dict.keys(), key=int):
+                v_info = pendentes_dict[n_pendente]
+                
+                # Container para cada linha de pendência
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([1, 3, 2])
+                    c1.markdown(f"### `{n_pendente:0>2}`")
+                    c2.markdown(f"**{v_info['nome']}**\n\n_{v_info['tel']}_")
+                    
+                    # Botão para marcar como pago direto aqui
+                    if c3.button("✅ Pago", key=f"btn_pay_{n_pendente}", use_container_width=True):
+                        with st.spinner("Atualizando..."):
+                            atualizar_venda_sheet(n_pendente, v_info['nome'], v_info['tel'], True)
+                            st.toast(f"Número {n_pendente} confirmado!")
+                            time.sleep(1)
+                            st.rerun()
+
+        with col_msg:
+            st.info("📢 **Mensagem para o Grupo**\nUse o texto abaixo para cobrar os pendentes no grupo.")
+            
+            # Formatação da mensagem de cobrança
+            data_hoje = datetime.now().strftime("%d/%m")
+            txt_cobrar = f"*⚠️ COMUNICADO IMPORTANTE - {data_hoje}*\n"
+            txt_cobrar += f"*RIFA: {dados['config']['titulo']}*\n\n"
+            txt_cobrar += "Abaixo a lista de números que ainda estão *AGUARDANDO PAGAMENTO*.\n"
+            txt_cobrar += "Pedimos a gentileza de enviar o comprovante para garantir sua participação! 🙏\n\n"
+            
+            for n_p in sorted(pendentes_dict.keys(), key=int):
+                txt_cobrar += f"❌ Nº {n_p:0>2} - {pendentes_dict[n_p]['nome']}\n"
+            
+            txt_cobrar += f"\n*Total de pendentes:* {len(pendentes_dict)}"
+            txt_cobrar += "\n\n🔗 *Ver mapa ao vivo:* https://sua-rifa.streamlit.app"
+            
+            st.text_area("Copie a lista:", value=txt_cobrar, height=350)
+            
+            # Botão de WhatsApp direto
+            msg_encoded = urllib.parse.quote(txt_cobrar)
+            st.markdown(f'''
+                <a href="https://wa.me/?text={msg_encoded}" target="_blank" 
+                   style="background-color: #25D366; color: white; padding: 15px; border-radius: 10px; 
+                   text-decoration: none; display: block; text-align: center; font-weight: bold;">
+                   <i class="fab fa-whatsapp"></i> Enviar Lista no Grupo
+                </a>
+            ''', unsafe_allow_html=True)
