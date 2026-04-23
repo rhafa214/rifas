@@ -432,61 +432,90 @@ with t_share:
         </a>
     ''', unsafe_allow_html=True)
 with t_pendentes:
-    st.subheader("📋 Gestão de Cobrança")
+    st.subheader("🟡 Controle de Recebimento")
     
     # Filtrar apenas quem NÃO pagou
     pendentes_dict = {n: v for n, v in vendas.items() if not v.get('pago')}
     
     if not pendentes_dict:
-        st.success("🎉 Sensacional! Todos os números reservados já foram pagos!")
+        st.success("🎉 Todos os números reservados já foram pagos!")
     else:
-        col_list, col_msg = st.columns([1.5, 1])
+        col_list, col_msg = st.columns([1.6, 1])
         
         with col_list:
-            st.write(f"Existem **{len(pendentes_dict)}** números aguardando pagamento.")
+            st.write(f"Existem **{len(pendentes_dict)}** reservas aguardando pagamento.")
             
-            # Criar uma tabela interativa ou lista com botões
-            for n_pendente in sorted(pendentes_dict.keys(), key=int):
-                v_info = pendentes_dict[n_pendente]
+            # Estilo CSS para o botão amarelo (hack para mudar a cor do popover)
+            st.markdown("""
+                <style>
+                div[data-testid="stPopover"] > button {
+                    background-color: #FFD700 !important;
+                    color: black !important;
+                    border: 1px solid #B8860B !important;
+                    font-weight: bold !important;
+                    width: 100%;
+                }
+                div[data-testid="stPopover"] > button:hover {
+                    background-color: #FFC107 !important;
+                    border: 1px solid #000 !important;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+
+            # Cabeçalho da Lista
+            c1, c2, c3 = st.columns([0.8, 2, 1.5])
+            c1.caption("Nº")
+            c2.caption("NOME DO PARTICIPANTE")
+            c3.caption("STATUS / AÇÃO")
+            st.divider()
+
+            # Lista de Pendentes
+            for n_p in sorted(pendentes_dict.keys(), key=int):
+                v_p = pendentes_dict[n_p]
                 
-                # Container para cada linha de pendência
-                with st.container(border=True):
-                    c1, c2, c3 = st.columns([1, 3, 2])
-                    c1.markdown(f"### `{n_pendente:0>2}`")
-                    c2.markdown(f"**{v_info['nome']}**\n\n_{v_info['tel']}_")
+                with st.container():
+                    col_n, col_nome, col_acao = st.columns([0.8, 2, 1.5])
                     
-                    # Botão para marcar como pago direto aqui
-                    if c3.button("✅ Pago", key=f"btn_pay_{n_pendente}", use_container_width=True):
-                        with st.spinner("Atualizando..."):
-                            atualizar_venda_sheet(n_pendente, v_info['nome'], v_info['tel'], True)
-                            st.toast(f"Número {n_pendente} confirmado!")
-                            time.sleep(1)
-                            st.rerun()
+                    col_n.markdown(f"### `{n_p:0>2}`")
+                    col_nome.markdown(f"**{v_p['nome']}**\n\n{v_p['tel']}")
+                    
+                    # Botão estilo "Badge" Amarelo que abre confirmação
+                    with col_acao.popover("🟡 PENDENTE", use_container_width=True):
+                        st.write(f"Confirmar pagamento do número {n_p}?")
+                        st.caption(f"Participante: {v_p['nome']}")
+                        
+                        if st.button("Confirmar ✅", key=f"conf_{n_p}", type="primary", use_container_width=True):
+                            with st.spinner("Atualizando..."):
+                                atualizar_venda_sheet(n_p, v_p['nome'], v_p['tel'], True)
+                                st.toast(f"Número {n_p} confirmado!")
+                                time.sleep(0.5)
+                                st.rerun()
+                    
+                    st.divider()
 
         with col_msg:
-            st.info("📢 **Mensagem para o Grupo**\nUse o texto abaixo para cobrar os pendentes no grupo.")
+            # --- PARTE DA MENSAGEM (IGUAL ANTERIOR, MAS MELHORADA) ---
+            st.info("📢 **Cobrança Rápida**")
             
-            # Formatação da mensagem de cobrança
-            data_hoje = datetime.now().strftime("%d/%m")
-            txt_cobrar = f"*⚠️ COMUNICADO IMPORTANTE - {data_hoje}*\n"
-            txt_cobrar += f"*RIFA: {dados['config']['titulo']}*\n\n"
-            txt_cobrar += "Abaixo a lista de números que ainda estão *AGUARDANDO PAGAMENTO*.\n"
-            txt_cobrar += "Pedimos a gentileza de enviar o comprovante para garantir sua participação! 🙏\n\n"
+            txt_cobrar = f"*⚠️ LISTA DE PENDENTES - {dados['config']['titulo']}*\n"
+            txt_cobrar += "------------------------------------------\n"
+            txt_cobrar += "Olá! Segue a lista dos números que ainda não foram confirmados. "
+            txt_cobrar += "Favor enviar o comprovante para garantir sua vaga! ⏳\n\n"
             
             for n_p in sorted(pendentes_dict.keys(), key=int):
-                txt_cobrar += f"❌ Nº {n_p:0>2} - {pendentes_dict[n_p]['nome']}\n"
+                txt_cobrar += f"🟡 Nº {n_p:0>2} - {pendentes_dict[n_p]['nome']}\n"
             
-            txt_cobrar += f"\n*Total de pendentes:* {len(pendentes_dict)}"
-            txt_cobrar += "\n\n🔗 *Ver mapa ao vivo:* https://sua-rifa.streamlit.app"
+            txt_cobrar += f"\n*Total:* {len(pendentes_dict)} números aguardando.\n"
+            txt_cobrar += "🔗 https://sua-rifa.streamlit.app"
             
-            st.text_area("Copie a lista:", value=txt_cobrar, height=350)
+            st.text_area("Texto para o Grupo:", value=txt_cobrar, height=350)
             
-            # Botão de WhatsApp direto
             msg_encoded = urllib.parse.quote(txt_cobrar)
             st.markdown(f'''
                 <a href="https://wa.me/?text={msg_encoded}" target="_blank" 
                    style="background-color: #25D366; color: white; padding: 15px; border-radius: 10px; 
-                   text-decoration: none; display: block; text-align: center; font-weight: bold;">
-                   <i class="fab fa-whatsapp"></i> Enviar Lista no Grupo
+                   text-decoration: none; display: flex; align-items: center; justify-content: center; 
+                   font-weight: bold; gap: 10px;">
+                   <i class="fab fa-whatsapp"></i> Postar Cobrança no Grupo
                 </a>
             ''', unsafe_allow_html=True)
