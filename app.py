@@ -312,8 +312,34 @@ t_mapa, t_sorteio, t_share, t_stats, t_pendentes = st.tabs([
 ])
 
 with t_mapa:
+    # --- ÁREA DE BUSCA ---
+    st.markdown("### 🔍 Consultar Meus Números")
+    busca = st.text_input("Digite seu nome ou parte dele para encontrar seus números:", placeholder="Ex: João Silva")
+    
+    # Lógica de Busca
+    if busca:
+        # Filtra números que contenham o termo de busca no nome ou telefone
+        resultados = {n: v for n, v in vendas.items() if busca.lower() in v['nome'].lower() or busca in v['tel']}
+        
+        if resultados:
+            st.success(f"✅ Encontramos **{len(resultados)}** número(s) para '{busca}':")
+            # Exibe os números em "badges" bonitos
+            cols_res = st.columns(min(len(resultados), 5))
+            for i, (n_achado, v_info) in enumerate(resultados.items()):
+                status_icon = "🟢 (Pago)" if v_info['pago'] else "🔴 (Pendente)"
+                cols_res[i % 5].metric(f"Nº {n_achado}", v_info['nome'], status_icon)
+        else:
+            st.warning(f"❌ Nenhum número encontrado para '{busca}'.")
+    
+    st.divider()
+
+    # --- MAPA VISUAL (GRID) ---
     st.write("🟢 Pago | 🔴 Pendente | 🟡 Disponível")
-    num_cols = 5
+    
+    num_cols = 10 # No PC fica melhor com 10
+    # Se quiser 5 colunas no celular, teria que usar CSS ou detectar largura, 
+    # mas 5 ou 10 é um padrão seguro.
+    
     for i in range(0, total_n, num_cols):
         cols = st.columns(num_cols)
         for j in range(num_cols):
@@ -321,19 +347,30 @@ with t_mapa:
             if n <= total_n:
                 ns = str(n)
                 with cols[j]:
+                    # Lógica de destaque da busca
+                    estilo_destaque = ""
+                    if busca and ns in resultados:
+                        # Se o número faz parte da busca, ele ganha uma borda azul
+                        estilo_destaque = "border: 3px solid #007bff; box-shadow: 0px 0px 10px #007bff;"
+
                     if ns in vendas:
                         v = vendas[ns]
                         cor = "🟢" if v['pago'] else "🔴"
+                        # Popover para ver detalhes do dono
                         with st.popover(f"{n:02d} {cor}", use_container_width=True):
                             st.write(f"👤 **Dono:** {v['nome']}")
+                            if v['pago']:
+                                st.success("Status: Pago")
+                            else:
+                                st.error("Status: Pendente")
+                            
                             if st.session_state.autenticado and v['tel']:
                                 t_l = re.sub(r'\D', '', v['tel'])
                                 msg = urllib.parse.quote(f"Olá {v['nome']}, confirmando seu número {n} na {dados['config']['titulo']}!")
                                 st.markdown(f'<a href="https://wa.me/55{t_l}?text={msg}" target="_blank" class="btn-whatsapp"><i class="fab fa-whatsapp"></i> WhatsApp</a>', unsafe_allow_html=True)
                     else:
-                        with st.popover(f"{n:02d} 🟡", use_container_width=True):
-                            st.write("✨ **Livre!**")
-
+                        # Número Livre
+                        st.button(f"{n:02d} 🟡", key=f"btn_livre_{n}", use_container_width=True, disabled=True)
 with t_sorteio:
     st.subheader("🎲 Sorteio Oficial")
     if st.button("🗑️ Resetar Ganhadores"): st.session_state.vencedores = {}; st.rerun()
