@@ -33,7 +33,67 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+# No st.markdown do início do arquivo, adicione:
+st.markdown("""
+    <style>
+    .winner-box {
+        text-align: center;
+        background: linear-gradient(135deg, #1e1e1e 0%, #343a40 100%);
+        padding: 40px;
+        border-radius: 20px;
+        border: 5px solid #FFD700;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        margin: 20px auto;
+        animation: pulse 2s infinite;
+    }
+    .winner-number {
+        font-size: 120px !important;
+        font-weight: 900;
+        color: #FFD700;
+        text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        margin-bottom: 0px;
+        line-height: 1;
+    }
+    .winner-name {
+        font-size: 45px !important;
+        color: white;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-top: 10px;
+    }
+    @keyframes pulse {
+        0% { transform: scale(1); box-shadow: 0 0 20px rgba(255, 215, 0, 0.2); }
+        50% { transform: scale(1.02); box-shadow: 0 0 40px rgba(255, 215, 0, 0.5); }
+        100% { transform: scale(1); box-shadow: 0 0 20px rgba(255, 215, 0, 0.2); }
+    }
+    </style>
+    
+    <!-- Script de Confetes Profissionais -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <script>
+    function festa() {
+        var duration = 5 * 1000;
+        var animationEnd = Date.now() + duration;
+        var defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 0 };
 
+        function randomInRange(min, max) {
+          return Math.random() * (max - min) + min;
+        }
+
+        var interval = setInterval(function() {
+          var timeLeft = animationEnd - Date.now();
+
+          if (timeLeft <= 0) {
+            return clearInterval(interval);
+          }
+
+          var particleCount = 50 * (timeLeft / duration);
+          confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } }));
+          confetti(Object.assign({}, defaults, { particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } }));
+        }, 250);
+    }
+    </script>
+""", unsafe_allow_html=True)
 # --- CONEXÃO GOOGLE SHEETS ---
 def conectar():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -371,43 +431,85 @@ with t_mapa:
                     else:
                         # Número Livre
                         st.button(f"{n:02d} 🟡", key=f"btn_livre_{n}", use_container_width=True, disabled=True)
+def exibir_vencedor_grande(n, nome, premio):
+    # Função para disparar confetes via JS e mostrar o card
+    st.markdown(f"""
+        <div class="winner-box">
+            <div style="color: #FFC107; font-size: 20px; font-weight: bold;">🏆 {premio.upper()} 🏆</div>
+            <div class="winner-number">{n}</div>
+            <div class="winner-name">{nome}</div>
+        </div>
+        <script>festa();</script>
+    """, unsafe_allow_html=True)
+
 with t_sorteio:
     st.subheader("🎲 Sorteio Oficial")
-    if st.button("🗑️ Resetar Ganhadores"): st.session_state.vencedores = {}; st.rerun()
     
+    # Botão de Reset
+    if st.button("🗑️ Limpar Resultados"): 
+        st.session_state.vencedores = {}
+        st.rerun()
+
     pagos_l = [n for n, v in vendas.items() if v["pago"]]
-    col_p1, col_p2, col_p3 = st.columns(3)
     
-    def animar(lista):
-        ph = st.empty()
-        for i in range(3,0,-1): ph.markdown(f"<h1 style='text-align:center;'>{i}</h1>", unsafe_allow_html=True); time.sleep(1)
-        res = random.choice(lista); st.balloons(); return res
+    if not pagos_l:
+        st.warning("Não há números pagos para sortear!")
+    else:
+        # Colunas para os botões de ação
+        c1, c2, c3 = st.columns(3)
+        
+        # Lógica de Sorteio com Animação de "Giro"
+        def realizar_sorteio(lista_disp, label_premio, key_venc):
+            ph = st.empty()
+            # Animação de sorteio rápido girando números
+            for _ in range(20):
+                n_aleatorio = random.choice(lista_disp)
+                ph.markdown(f"<h1 style='text-align:center; font-size: 80px; color: gray;'>{n_aleatorio}</h1>", unsafe_allow_html=True)
+                time.sleep(0.1)
+            
+            # Resultado Final
+            venc_n = random.choice(lista_disp)
+            st.session_state.vencedores[key_venc] = {"n": venc_n, "nome": vendas[venc_n]["nome"]}
+            st.rerun()
 
-    with col_p3:
-        st.write(f"3º: {dados['config'].get('premio3')}")
-        if st.button("Sortear 3º"):
-            if pagos_l:
-                r = animar(pagos_l); st.session_state.vencedores["3"] = {"n": r, "nome": vendas[r]["nome"]}; st.rerun()
-        if "3" in st.session_state.vencedores: 
-            v = st.session_state.vencedores["3"]; st.success(f"🥉 {v['n']} - {v['nome']}")
+        # Botões de Sorteio
+        with c3:
+            if st.button("Sortear 3º Prêmio 🥉", use_container_width=True):
+                realizar_sorteio(pagos_l, "3º Prêmio", "3")
+        with c2:
+            if st.button("Sortear 2º Prêmio 🥈", use_container_width=True):
+                lf = [n for n in pagos_l if n != st.session_state.vencedores.get("3",{}).get("n")]
+                realizar_sorteio(lf, "2º Prêmio", "2")
+        with c1:
+            if st.button("Sortear 1º Prêmio 🥇", use_container_width=True):
+                lf = [n for n in pagos_l if n not in [st.session_state.vencedores.get(x,{}).get("n") for x in ["2","3"]]]
+                realizar_sorteio(lf, "1º Prêmio", "1")
 
-    with col_p2:
-        st.write(f"2º: {dados['config'].get('premio2')}")
-        if st.button("Sortear 2º"):
-            lf = [n for n in pagos_l if n != st.session_state.vencedores.get("3",{}).get("n")]
-            if lf:
-                r = animar(lf); st.session_state.vencedores["2"] = {"n": r, "nome": vendas[r]["nome"]}; st.rerun()
-        if "2" in st.session_state.vencedores: 
-            v = st.session_state.vencedores["2"]; st.success(f"🥈 {v['n']} - {v['nome']}")
+        st.divider()
 
-    with col_p1:
-        st.write(f"1º: {dados['config'].get('premio1')}")
-        if st.button("Sortear 1º"):
-            lf = [n for n in pagos_l if n not in [st.session_state.vencedores.get(x,{}).get("n") for x in ["2","3"]]]
-            if lf:
-                r = animar(lf); st.session_state.vencedores["1"] = {"n": r, "nome": vendas[r]["nome"]}; st.rerun()
-        if "1" in st.session_state.vencedores: 
-            v = st.session_state.vencedores["1"]; st.success(f"🥇 {v['n']} - {v['nome']}")
+        # EXIBIÇÃO CENTRAL DO ÚLTIMO GANHADOR
+        # Pegamos o sorteio mais recente para mostrar em destaque
+        if st.session_state.vencedores:
+            # Ordena para pegar o mais importante (1 > 2 > 3)
+            ultimo_id = sorted(st.session_state.vencedores.keys())[0]
+            venc = st.session_state.vencedores[ultimo_id]
+            premio_nome = dados['config'].get(f'premio{ultimo_id}')
+            
+            # O SHOW DO GANHADOR
+            exibir_vencedor_grande(venc['n'], venc['nome'], f"{ultimo_id}º Prêmio: {premio_nome}")
+            
+            # Botão para baixar o card que criamos anteriormente
+            card_bytes = gerar_card_ganhador(venc['n'], venc['nome'], premio_nome, dados['config']['titulo'], ultimo_id)
+            st.download_button(f"📥 Baixar Card de Vitória do {ultimo_id}º", card_bytes, f"ganhador_{ultimo_id}.png", "image/png")
+
+        # Pequena tabela com todos os ganhadores abaixo
+        if len(st.session_state.vencedores) > 1:
+            st.write("### 📜 Outros Ganhadores")
+            cols_v = st.columns(3)
+            for i, k in enumerate(["1", "2", "3"]):
+                if k in st.session_state.vencedores:
+                    res = st.session_state.vencedores[k]
+                    cols_v[i].info(f"**{k}º Lugar:** {res['n']} - {res['nome']}")
 with t_share:
     st.subheader("📢 Gerar Card de Divulgação")
     
