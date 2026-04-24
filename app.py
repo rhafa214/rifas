@@ -105,6 +105,66 @@ def conectar():
     client = gspread.authorize(creds)
     return client.open(NOME_PLANILHA)
 
+def gerar_card_ganhador(numero, nome, premio, titulo_rifa, colocacao):
+    # Configurações de Alta Definição
+    largura = 1000
+    altura = 1000
+    img = Image.new('RGB', (largura, altura), color="#1E1E1E") # Fundo Escuro Elegante
+    draw = ImageDraw.Draw(img)
+
+    def carregar_fonte(tamanho):
+        fontes = [
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+            "C:\\Windows\\Fonts\\arialbd.ttf", 
+            "arial.ttf"
+        ]
+        for f in fontes:
+            try: return ImageFont.truetype(f, tamanho)
+            except: continue
+        return ImageFont.load_default()
+
+    # Fontes
+    f_titulo = carregar_fonte(45)
+    f_parabens = carregar_fonte(80)
+    f_numero = carregar_fonte(200)
+    f_nome = carregar_fonte(70)
+    f_premio = carregar_fonte(50)
+    f_rodape = carregar_fonte(30)
+
+    # Decoração (Círculos e Detalhes Dourados)
+    draw.ellipse([-100, -100, 300, 300], outline="#FFD700", width=5)
+    draw.ellipse([800, 800, 1100, 1100], outline="#FFD700", width=5)
+    
+    # Título da Rifa
+    draw.text((largura//2, 80), titulo_rifa.upper(), fill="#FFD700", font=f_titulo, anchor="mm")
+    
+    # Texto "PARABÉNS"
+    draw.text((largura//2, 200), "PARABÉNS!", fill="#FFFFFF", font=f_parabens, anchor="mm")
+    
+    # Círculo Central do Número
+    cor_podio = "#FFD700" if str(colocacao) == "1" else "#C0C0C0" if str(colocacao) == "2" else "#CD7F32"
+    draw.ellipse([350, 280, 650, 580], outline=cor_podio, width=15)
+    
+    # O Número Sorteado
+    draw.text((largura//2, 430), str(numero), fill="#FFFFFF", font=f_numero, anchor="mm")
+    
+    # Nome do Ganhador
+    draw.text((largura//2, 680), nome.upper(), fill=cor_podio, font=f_nome, anchor="mm")
+    
+    # O Prêmio
+    draw.rectangle([150, 750, 850, 830], fill=cor_podio)
+    draw.text((largura//2, 790), f"GANHOU: {premio}", fill="#1E1E1E", font=f_premio, anchor="mm")
+    
+    # Rodapé
+    data_str = datetime.now().strftime("%d/%m/%Y")
+    draw.text((largura//2, 920), f"Sorteio realizado em {data_str}", fill="#888888", font=f_rodape, anchor="mm")
+
+    # Converter para Bytes
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
 def carregar_dados():
     try:
         sh = conectar()
