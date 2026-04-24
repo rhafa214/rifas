@@ -304,6 +304,8 @@ def salvar_config_sheet(titulo, total, preco, p1, p2, p3, data):
 # --- INICIALIZAÇÃO DE ESTADO ---
 if 'autenticado' not in st.session_state: st.session_state.autenticado = False
 if 'vencedores' not in st.session_state: st.session_state.vencedores = {}
+if 'mostrar_modal' not in st.session_state: st.session_state.mostrar_modal = False
+if 'venc_temp' not in st.session_state: st.session_state.venc_temp = {}
 
 dados = carregar_dados()
 if not dados: st.stop()
