@@ -94,6 +94,88 @@ st.markdown("""
     }
     </script>
 """, unsafe_allow_html=True)
+
+st.markdown("""
+    <style>
+    /* Camada de fundo desfocado */
+    .overlay {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(10px);
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        animation: fadeIn 0.5s ease-out;
+    }
+
+    /* Caixa do Ganhador Centralizada */
+    .winner-card-xl {
+        background: linear-gradient(145deg, #1a1a1a, #2d2d2d);
+        padding: 60px;
+        border-radius: 30px;
+        border: 4px solid #FFD700;
+        box-shadow: 0 0 50px rgba(255, 215, 0, 0.4);
+        text-align: center;
+        max-width: 80%;
+        color: white;
+    }
+
+    .num-grande {
+        font-size: 180px !important;
+        font-weight: 900;
+        color: #FFD700;
+        margin: 0;
+        line-height: 1;
+        text-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
+    }
+
+    .nome-grande {
+        font-size: 60px !important;
+        margin-top: 20px;
+        text-transform: uppercase;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    </style>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <script>
+    function dispararConfete() {
+        var end = Date.now() + (5 * 1000);
+        var colors = ['#FFD700', '#ffffff', '#ff0000'];
+
+        (function frame() {
+          confetti({
+            particleCount: 3,
+            angle: 60,
+            spread: 55,
+            origin: { x: 0 },
+            colors: colors
+          });
+          confetti({
+            particleCount: 3,
+            angle: 120,
+            spread: 55,
+            origin: { x: 1 },
+            colors: colors
+          });
+
+          if (Date.now() < end) {
+            requestAnimationFrame(frame);
+          }
+        }());
+    }
+    </script>
+""", unsafe_allow_html=True)
+
+
 # --- CONEXÃO GOOGLE SHEETS ---
 def conectar():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -515,61 +597,74 @@ with t_sorteio:
     if not pagos_l:
         st.warning("Não há números pagos para sortear!")
     else:
-        # Colunas para os botões de ação
         c1, c2, c3 = st.columns(3)
         
-        # Lógica de Sorteio com Animação de "Giro"
-        def realizar_sorteio(lista_disp, label_premio, key_venc):
-            ph = st.empty()
-            # Animação de sorteio rápido girando números
-            for _ in range(20):
-                n_aleatorio = random.choice(lista_disp)
-                ph.markdown(f"<h1 style='text-align:center; font-size: 80px; color: gray;'>{n_aleatorio}</h1>", unsafe_allow_html=True)
-                time.sleep(0.1)
+        def iniciar_sorteio(lista, premio_nome, chave):
+            # 1. Animação de Shuffle (Embaralhar)
+            placeholder = st.empty()
+            for _ in range(25):
+                num_fake = random.choice(lista)
+                placeholder.markdown(f"<h1 style='text-align:center; font-size:100px; color:#FFD700;'>{num_fake}</h1>", unsafe_allow_html=True)
+                time.sleep(0.08)
             
-            # Resultado Final
-            venc_n = random.choice(lista_disp)
-            st.session_state.vencedores[key_venc] = {"n": venc_n, "nome": vendas[venc_n]["nome"]}
+            # 2. Sorteio Real
+            venc_n = random.choice(lista)
+            st.session_state.venc_temp = {
+                "n": venc_n, 
+                "nome": vendas[venc_n]["nome"], 
+                "premio": premio_nome,
+                "chave": chave
+            }
+            st.session_state.vencedores[chave] = st.session_state.venc_temp
+            st.session_state.mostrar_modal = True
+            placeholder.empty()
             st.rerun()
 
-        # Botões de Sorteio
-        with c3:
-            if st.button("Sortear 3º Prêmio 🥉", use_container_width=True):
-                realizar_sorteio(pagos_l, "3º Prêmio", "3")
-        with c2:
-            if st.button("Sortear 2º Prêmio 🥈", use_container_width=True):
-                lf = [n for n in pagos_l if n != st.session_state.vencedores.get("3",{}).get("n")]
-                realizar_sorteio(lf, "2º Prêmio", "2")
-        with c1:
-            if st.button("Sortear 1º Prêmio 🥇", use_container_width=True):
-                lf = [n for n in pagos_l if n not in [st.session_state.vencedores.get(x,{}).get("n") for x in ["2","3"]]]
-                realizar_sorteio(lf, "1º Prêmio", "1")
+        # Botões
+        if c3.button("Sortear 3º Prêmio 🥉", use_container_width=True):
+            iniciar_sorteio(pagos_l, dados['config'].get('premio3'), "3")
+        if c2.button("Sortear 2º Prêmio 🥈", use_container_width=True):
+            lf = [n for n in pagos_l if n != st.session_state.vencedores.get("3",{}).get("n")]
+            iniciar_sorteio(lf, dados['config'].get('premio2'), "2")
+        if c1.button("Sortear 1º Prêmio 🥇", use_container_width=True):
+            lf = [n for n in pagos_l if n not in [st.session_state.vencedores.get(x,{}).get("n") for x in ["2","3"]]]
+            iniciar_sorteio(lf, dados['config'].get('premio1'), "1")
 
+    # --- O MODAL EM TELA CHEIA (OVERLAY) ---
+    if st.session_state.mostrar_modal:
+        v = st.session_state.venc_temp
+        st.markdown(f"""
+            <div class="overlay">
+                <div class="winner-card-xl">
+                    <h2 style="color:#FFD700; margin:0;">🏆 {v['premio']} 🏆</h2>
+                    <p class="num-grande">{v['n']}</p>
+                    <p class="nome-grande">{v['nome']}</p>
+                    <p style="font-size:20px; color:#aaa;">PARABÉNS AO GANHADOR!</p>
+                </div>
+            </div>
+            <script>dispararConfete();</script>
+        """, unsafe_allow_html=True)
+        
+        # Botões para fechar e baixar card (fora do overlay HTML para o Streamlit ler)
+        col_b1, col_b2, col_b3 = st.columns([1,2,1])
+        with col_b2:
+            st.write("") # Espaçador
+            if st.button("❌ FECHAR E VOLTAR AO SITE", use_container_width=True):
+                st.session_state.mostrar_modal = False
+                st.rerun()
+            
+            # Botão de download do card profissional (aquele que criamos antes)
+            card_bytes = gerar_card_ganhador(v['n'], v['nome'], v['premio'], dados['config']['titulo'], v['chave'])
+            st.download_button("📥 BAIXAR CARD PARA WHATSAPP", card_bytes, f"ganhador_{v['n']}.png", "image/png", use_container_width=True)
+
+    # Lista de ganhadores abaixo (histórico da sessão)
+    if st.session_state.vencedores and not st.session_state.mostrar_modal:
         st.divider()
-
-        # EXIBIÇÃO CENTRAL DO ÚLTIMO GANHADOR
-        # Pegamos o sorteio mais recente para mostrar em destaque
-        if st.session_state.vencedores:
-            # Ordena para pegar o mais importante (1 > 2 > 3)
-            ultimo_id = sorted(st.session_state.vencedores.keys())[0]
-            venc = st.session_state.vencedores[ultimo_id]
-            premio_nome = dados['config'].get(f'premio{ultimo_id}')
-            
-            # O SHOW DO GANHADOR
-            exibir_vencedor_grande(venc['n'], venc['nome'], f"{ultimo_id}º Prêmio: {premio_nome}")
-            
-            # Botão para baixar o card que criamos anteriormente
-            card_bytes = gerar_card_ganhador(venc['n'], venc['nome'], premio_nome, dados['config']['titulo'], ultimo_id)
-            st.download_button(f"📥 Baixar Card de Vitória do {ultimo_id}º", card_bytes, f"ganhador_{ultimo_id}.png", "image/png")
-
-        # Pequena tabela com todos os ganhadores abaixo
-        if len(st.session_state.vencedores) > 1:
-            st.write("### 📜 Outros Ganhadores")
-            cols_v = st.columns(3)
-            for i, k in enumerate(["1", "2", "3"]):
-                if k in st.session_state.vencedores:
-                    res = st.session_state.vencedores[k]
-                    cols_v[i].info(f"**{k}º Lugar:** {res['n']} - {res['nome']}")
+        st.write("### 📜 Resultados deste Sorteio")
+        for k in ["1", "2", "3"]:
+            if k in st.session_state.vencedores:
+                res = st.session_state.vencedores[k]
+                st.info(f"**{k}º Lugar:** Número {res['n']} - {res['nome']}")
 with t_share:
     st.subheader("📢 Gerar Card de Divulgação")
     
