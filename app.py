@@ -97,84 +97,45 @@ st.markdown("""
 
 st.markdown("""
     <style>
-    /* Camada de fundo desfocado */
     .overlay {
         position: fixed;
         top: 0; left: 0;
-        width: 100vw; height: 100vh;
-        background: rgba(0, 0, 0, 0.7);
-        backdrop-filter: blur(10px);
-        z-index: 9999;
+        width: 100%; height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(12px);
+        z-index: 999999;
         display: flex;
-        flex-direction: column;
         justify-content: center;
         align-items: center;
-        animation: fadeIn 0.5s ease-out;
+        flex-direction: column;
     }
-
-    /* Caixa do Ganhador Centralizada */
     .winner-card-xl {
-        background: linear-gradient(145deg, #1a1a1a, #2d2d2d);
-        padding: 60px;
+        background: #1a1a1a;
+        padding: 50px;
         border-radius: 30px;
         border: 4px solid #FFD700;
-        box-shadow: 0 0 50px rgba(255, 215, 0, 0.4);
         text-align: center;
-        max-width: 80%;
         color: white;
-    }
-
-    .num-grande {
-        font-size: 180px !important;
-        font-weight: 900;
-        color: #FFD700;
-        margin: 0;
-        line-height: 1;
-        text-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
-    }
-
-    .nome-grande {
-        font-size: 60px !important;
-        margin-top: 20px;
-        text-transform: uppercase;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
+        box-shadow: 0 0 80px rgba(255, 215, 0, 0.3);
+        margin-bottom: 20px;
     }
     </style>
-
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    
     <script>
-    function dispararConfete() {
-        var end = Date.now() + (5 * 1000);
-        var colors = ['#FFD700', '#ffffff', '#ff0000'];
-
-        (function frame() {
-          confetti({
-            particleCount: 3,
-            angle: 60,
-            spread: 55,
-            origin: { x: 0 },
-            colors: colors
-          });
-          confetti({
-            particleCount: 3,
-            angle: 120,
-            spread: 55,
-            origin: { x: 1 },
-            colors: colors
-          });
-
-          if (Date.now() < end) {
-            requestAnimationFrame(frame);
-          }
-        }());
+    // Função para fechar automaticamente após X segundos
+    function fecharAutomatico(segundos) {
+        setTimeout(function() {
+            // Procura o botão de fechar do Streamlit e clica nele
+            const botoes = window.parent.document.querySelectorAll('button');
+            for (let b of botoes) {
+                if (b.innerText.includes('FECHAR E VOLTAR')) {
+                    b.click();
+                }
+            }
+        }, segundos * 1000);
     }
     </script>
 """, unsafe_allow_html=True)
-
 
 # --- CONEXÃO GOOGLE SHEETS ---
 def conectar():
@@ -667,6 +628,63 @@ with t_sorteio:
             if k in st.session_state.vencedores:
                 res = st.session_state.vencedores[k]
                 st.info(f"**{k}º Lugar:** Número {res['n']} - {res['nome']}")
+                # --- O MODAL EM TELA CHEIA (OVERLAY) ---
+    if st.session_state.get('mostrar_modal', False):
+        v = st.session_state.venc_temp
+        
+        # Exibe o Overlay Visual
+        st.markdown(f"""
+            <div class="overlay">
+                <div class="winner-card-xl">
+                    <h2 style="color:#FFD700; margin:0; font-size: 30px;">🏆 {v['premio']} 🏆</h2>
+                    <p style="font-size: 180px; font-weight: 900; color: #FFD700; margin: 10px 0;">{v['n']}</p>
+                    <p style="font-size: 60px; text-transform: uppercase; margin: 0;">{v['nome']}</p>
+                    <p style="font-size: 20px; color: #888; margin-top: 20px;">O sorteio fechará automaticamente em 15 segundos...</p>
+                </div>
+            </div>
+            <script>
+                dispararConfete();
+                fecharAutomatico(15); // Inicia contagem de 15s
+            </script>
+        """, unsafe_allow_html=True)
+        
+        # Botões de Ação (Colocados em uma posição que o Streamlit consiga ler o clique)
+        # Usamos colunas vazias para centralizar os botões reais do Streamlit abaixo do modal visual
+        st.markdown("<br>", unsafe_allow_html=True)
+        c_b1, c_b2, c_b3 = st.columns([1, 1.5, 1])
+        
+        with c_b2:
+            # BOTÃO DE FECHAR MANUAL (O JS acima procura por esse texto exato)
+            if st.button("❌ FECHAR E VOLTAR AO SITE", use_container_width=True, type="primary"):
+                st.session_state.mostrar_modal = False
+                st.rerun()
+            
+            # BOTÃO DE DOWNLOAD
+            card_bytes = gerar_card_ganhador(v['n'], v['nome'], v['premio'], dados['config']['titulo'], v['chave'])
+            st.download_button(
+                label="📥 BAIXAR CARD PARA WHATSAPP",
+                data=card_bytes,
+                file_name=f"ganhador_{v['n']}.png",
+                mime="image/png",
+                use_container_width=True
+            )
+            
+            st.caption("Dica: Baixe o card antes de fechar!")
+
+    # --- LISTA DE GANHADORES (SÓ APARECE QUANDO O MODAL ESTÁ FECHADO) ---
+    if st.session_state.vencedores and not st.session_state.mostrar_modal:
+        st.divider()
+        st.subheader("📜 Ganhadores Confirmados")
+        cols_v = st.columns(3)
+        # Exibe 1º, 2º e 3º se existirem
+        for i, k in enumerate(["1", "2", "3"]):
+            if k in st.session_state.vencedores:
+                res = st.session_state.vencedores[k]
+                with cols_v[i]:
+                    st.info(f"**{k}º Lugar**\n\nNº {res['n']}\n\n{res['nome']}")
+                    # Permite baixar o card novamente aqui caso tenha fechado o modal
+                    c_bytes = gerar_card_ganhador(res['n'], res['nome'], res['premio'], dados['config']['titulo'], k)
+                    st.download_button(f"📥 Card {k}º", c_bytes, f"card_{k}.png", key=f"dl_fim_{k}")
 with t_share:
     st.subheader("📢 Gerar Card de Divulgação")
     
